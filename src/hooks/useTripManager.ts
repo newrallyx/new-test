@@ -12,6 +12,7 @@ import type {
   TripReview,
   Waypoint,
 } from '../types/trip'
+import { normalizeSegmentNote, normalizeScore } from '../utils/segmentScores'
 
 interface SegmentRef {
   tripIndex: number
@@ -22,7 +23,13 @@ interface SegmentRef {
   segment: RouteSegment
 }
 
+interface SegmentSelection {
+  dayId: string
+  segmentId: string
+}
+
 interface UseTripManagerParams {
+  isReadonlyMode: boolean
   activeWorkspace: TripCategory
   filters: FilterState
   setFilters: Dispatch<SetStateAction<FilterState>>
@@ -54,7 +61,20 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 }
 
+function getPreviousSegmentSelection(ref: SegmentRef): SegmentSelection | null {
+  const flatSegments = ref.trip.days.flatMap((day) =>
+    day.routeSegments.map((segment) => ({
+      dayId: day.id,
+      segmentId: segment.id,
+    })),
+  )
+  const currentIndex = flatSegments.findIndex((item) => item.segmentId === ref.segment.id)
+  if (currentIndex <= 0) return null
+  return flatSegments[currentIndex - 1]
+}
+
 export function useTripManager({
+  isReadonlyMode,
   activeWorkspace,
   filters,
   setFilters,
@@ -73,6 +93,12 @@ export function useTripManager({
   tripReview,
   activeSegmentId,
 }: UseTripManagerParams) {
+  const blockReadonlyWrite = useCallback((actionName: string): boolean => {
+    if (!isReadonlyMode) return false
+    console.warn(`[readonly-demo] Blocked write action: ${actionName}`)
+    return true
+  }, [isReadonlyMode])
+
   const findSegmentRef = useCallback((segmentId: string, data = tripReview): SegmentRef | null => {
     for (let t = 0; t < data.trips.length; t += 1) {
       const trip = data.trips[t]
@@ -100,6 +126,7 @@ export function useTripManager({
   }, [findSegmentRef])
 
   const updateSegment = useCallback((segmentId: string, updater: (segment: RouteSegment) => RouteSegment) => {
+    if (blockReadonlyWrite('updateSegment')) return
     setTripReview((prev) => ({
       trips: prev.trips.map((trip) => ({
         ...trip,
@@ -109,9 +136,15 @@ export function useTripManager({
         })),
       })),
     }))
-  }, [setTripReview])
+  }, [blockReadonlyWrite, setTripReview])
 
   const updateSegmentMeta = useCallback((segmentId: string, patch: { name: string; date: string }) => {
+    if (blockReadonlyWrite('updateSegmentMeta')) return
+    const currentRef = findSegmentRef(segmentId)
+    const fallbackSelection = currentRef && patch.date && patch.date !== currentRef.day.date
+      ? getPreviousSegmentSelection(currentRef)
+      : null
+
     setTripReview((prev) => {
       const ref = findSegmentRef(segmentId, prev)
       if (!ref) return prev
@@ -167,11 +200,15 @@ export function useTripManager({
 
     setFilters((prev) => {
       if (prev.segmentId !== segmentId && activeSegmentId !== segmentId) return prev
+      if (fallbackSelection) {
+        return { ...prev, dayId: fallbackSelection.dayId, segmentId: fallbackSelection.segmentId }
+      }
       return { ...prev, dayId: patch.date || prev.dayId }
     })
-  }, [activeSegmentId, findSegmentRef, setFilters, setTripReview])
+  }, [activeSegmentId, blockReadonlyWrite, findSegmentRef, setFilters, setTripReview])
 
   const moveSegmentInTrip = useCallback((segmentId: string, direction: 'up' | 'down') => {
+    if (blockReadonlyWrite('moveSegmentInTrip')) return
     setTripReview((prev) => {
       const ref = findSegmentRef(segmentId, prev)
       if (!ref) return prev
@@ -204,7 +241,7 @@ export function useTripManager({
 
       return { trips: nextTrips }
     })
-  }, [findSegmentRef, setTripReview])
+  }, [blockReadonlyWrite, findSegmentRef, setTripReview])
 
   const canMoveSegment = useCallback((segmentId: string | null, direction: 'up' | 'down'): boolean => {
     if (!segmentId || !filters.tripId) return false
@@ -218,6 +255,7 @@ export function useTripManager({
   }, [filters.tripId, findSegmentRef])
 
   const addTrip = useCallback((payload: { title: string; startDate: string; endDate: string }) => {
+    if (blockReadonlyWrite('addTrip')) return
     setTripReview((prev) => ({
       trips: [
         ...prev.trips,
@@ -232,7 +270,7 @@ export function useTripManager({
         },
       ],
     }))
-  }, [activeWorkspace, setTripReview])
+  }, [activeWorkspace, blockReadonlyWrite, setTripReview])
 
   const addSegment = useCallback((payload: {
     tripId: string
@@ -247,7 +285,11 @@ export function useTripManager({
     endCoord?: CoordPoint
     startPlaceId?: string
     endPlaceId?: string
+    scenicScore?: number | null
+    difficultyScore?: number | null
+    note?: string
   }) => {
+    if (blockReadonlyWrite('addSegment')) return
     setTripReview((prev) => ({
       trips: prev.trips.map((trip) => {
         if (trip.id !== payload.tripId) return trip
@@ -267,6 +309,9 @@ export function useTripManager({
           startPlaceId: payload.startPlaceId,
           endPlaceId: payload.endPlaceId,
           order: matchedDay?.routeSegments.length ?? 0,
+          scenicScore: normalizeScore(payload.scenicScore),
+          difficultyScore: normalizeScore(payload.difficultyScore),
+          note: normalizeSegmentNote(payload.note),
         }
 
         if (!matchedDay) {
@@ -284,9 +329,10 @@ export function useTripManager({
         }
       }),
     }))
-  }, [setTripReview])
+  }, [blockReadonlyWrite, setTripReview])
 
   const deleteSegment = useCallback((payload: { segmentId?: string; index: number; name: string }) => {
+    if (blockReadonlyWrite('deleteSegment')) return
     const confirmed = window.confirm(`确定删除“${payload.name}”这段路段吗？此操作不可恢复。`)
     if (!confirmed) return
 
@@ -327,9 +373,10 @@ export function useTripManager({
       setEditingEndpointsSegmentId(null)
       setEndpointDraft(null)
     }
-  }, [editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, listViewSegments, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setSelectedWaypointId, setTripReview, setWaypointDrafts])
+  }, [blockReadonlyWrite, editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, listViewSegments, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setSelectedWaypointId, setTripReview, setWaypointDrafts])
 
   const deleteTrip = useCallback((tripId: string) => {
+    if (blockReadonlyWrite('deleteTrip')) return
     const target = workspaceTrips.find((trip) => trip.id === tripId)
     if (!target) return
 
@@ -360,9 +407,10 @@ export function useTripManager({
       setEditingEndpointsSegmentId(null)
       setEndpointDraft(null)
     }
-  }, [editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, filters.tripId, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setFilters, setSelectedWaypointId, setTripReview, setWaypointDrafts, workspaceTrips])
+  }, [blockReadonlyWrite, editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, filters.tripId, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setFilters, setSelectedWaypointId, setTripReview, setWaypointDrafts, workspaceTrips])
 
   const updateTrip = useCallback((tripId: string, patch: { title: string; startDate: string; endDate: string }): boolean => {
+    if (blockReadonlyWrite('updateTrip')) return false
     if (patch.endDate < patch.startDate) return false
     setTripReview((prev) => ({
       trips: prev.trips.map((trip) =>
@@ -372,9 +420,10 @@ export function useTripManager({
       ),
     }))
     return true
-  }, [setTripReview])
+  }, [blockReadonlyWrite, setTripReview])
 
   const moveTrip = useCallback((tripId: string, direction: 'up' | 'down') => {
+    if (blockReadonlyWrite('moveTrip')) return
     setTripReview((prev) => {
       const scopedTrips = prev.trips.filter((trip) => trip.category === activeWorkspace)
       const idx = scopedTrips.findIndex((trip) => trip.id === tripId)
@@ -393,9 +442,10 @@ export function useTripManager({
         ),
       }
     })
-  }, [activeWorkspace, setTripReview])
+  }, [activeWorkspace, blockReadonlyWrite, setTripReview])
 
   const reorderTrips = useCallback((orderedTripIds: string[]) => {
+    if (blockReadonlyWrite('reorderTrips')) return
     setTripReview((prev) => {
       const scopedTrips = prev.trips.filter((trip) => trip.category === activeWorkspace)
       if (orderedTripIds.length !== scopedTrips.length) return prev
@@ -412,7 +462,7 @@ export function useTripManager({
         ),
       }
     })
-  }, [activeWorkspace, setTripReview])
+  }, [activeWorkspace, blockReadonlyWrite, setTripReview])
 
   return {
     findSegmentRef,

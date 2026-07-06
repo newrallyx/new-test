@@ -179,10 +179,6 @@ function toLatLng(points: CoordPoint[]): LatLngExpression[] {
   return points.map((point) => [point.lat, point.lon] as LatLngExpression)
 }
 
-function fallbackLineFromPoints(points: Array<{ lat: number; lon: number }>): CoordPoint[] {
-  return points.map((point) => ({ lat: point.lat, lon: point.lon }))
-}
-
 function downsampleLine(points: CoordPoint[], targetSize: number): CoordPoint[] {
   if (points.length <= targetSize || targetSize < 3) return points
   const step = (points.length - 1) / (targetSize - 1)
@@ -319,7 +315,7 @@ function MapPanel({
 
           if (!active || runId !== buildRunIdRef.current) return
 
-          let line = fallbackLineFromPoints(planningPoints.map((point) => ({ lat: point.lat, lon: point.lng })))
+          let line: CoordPoint[] = []
           if (route?.polyline?.length) {
             line = route.polyline.map(([lat, lng]) => ({ lat, lon: lng }))
             patches.push({

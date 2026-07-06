@@ -727,3 +727,94 @@ select:disabled {
 
   .map-container { min-height: 0; }
 }
+
+.api-key-setup-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #eef2f7;
+}
+
+.api-key-setup-panel {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid #d8dee8;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+}
+
+.api-key-brand-block {
+  display: grid;
+  gap: 6px;
+}
+
+.api-key-brand-block h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.api-key-brand-block p,
+.api-key-setup-body,
+.api-key-message {
+  margin: 0;
+}
+
+.api-key-brand-block p {
+  color: #2563eb;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.api-key-setup-body {
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.api-key-form {
+  display: grid;
+  gap: 12px;
+}
+
+.api-key-form label {
+  display: grid;
+  gap: 7px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.api-key-form input {
+  width: 100%;
+  padding: 11px 12px;
+  border-color: #cbd5e1;
+}
+
+.api-key-form input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.22);
+  border-color: #2563eb;
+}
+
+.api-key-form button,
+.api-key-setup-panel > button {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 11px 14px;
+}
+
+.api-key-form button:hover:not(:disabled),
+.api-key-setup-panel > button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.api-key-message {
+  color: #b91c1c;
+  font-size: 13px;
+}

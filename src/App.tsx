@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { appMode, isReadonlyDemoMode } from './config/appMode'
 import FilterPanel from './components/FilterPanel'
 import MapPanel from './components/MapPanel'
@@ -16,7 +16,150 @@ import { formatDistance, getDayDistanceMeters, getTrackDistanceMeters, getTripDi
 import { normalizeSegmentNote, normalizeScore } from './utils/segmentScores'
 import './styles/app.css'
 
+
+type ApiKeyGateStatus = 'checking' | 'ready' | 'missing' | 'error'
+
+const apiKeyCopy = {
+  appTitle: '\u81ea\u9a7e\u65c5\u884c\u590d\u76d8\u4e0e\u8def\u7ebf\u91cd\u5efa\u5de5\u5177',
+  checkingTitle: '\u6b63\u5728\u68c0\u67e5\u9ad8\u5fb7 API Key',
+  checkingBody: '\u8bf7\u7a0d\u5019\uff0c\u6b63\u5728\u8bfb\u53d6\u672c\u5730\u914d\u7f6e\u3002',
+  setupTitle: '\u914d\u7f6e\u9ad8\u5fb7 Web \u670d\u52a1 Key',
+  setupBody: '\u9996\u6b21\u4f7f\u7528\u9700\u8981\u4e00\u4e2a\u9ad8\u5fb7 Web \u670d\u52a1 Key\uff0c\u7528\u4e8e\u5730\u70b9\u8054\u60f3\u548c\u8def\u5f84\u89c4\u5212\u3002',
+  keyLabel: 'AMAP_WEB_API_KEY',
+  keyPlaceholder: '\u7c98\u8d34\u4f60\u7684\u9ad8\u5fb7 Web \u670d\u52a1 Key',
+  save: '\u4fdd\u5b58\u5e76\u8fdb\u5165\u7a0b\u5e8f',
+  saving: '\u6b63\u5728\u4fdd\u5b58...',
+  retry: '\u91cd\u8bd5\u68c0\u6d4b',
+  errorTitle: '\u65e0\u6cd5\u8bfb\u53d6 API Key \u914d\u7f6e',
+  invalidKey: '\u8bf7\u8f93\u5165\u6709\u6548\u7684\u9ad8\u5fb7 Web \u670d\u52a1 Key\u3002',
+  saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002',
+}
+
+function ApiKeyStatusShell({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
+  return (
+    <main className="api-key-setup-shell">
+      <section className="api-key-setup-panel">
+        <div className="api-key-brand-block">
+          <h1>{apiKeyCopy.appTitle}</h1>
+          <p>{title}</p>
+        </div>
+        <p className="api-key-setup-body">{body}</p>
+        {action}
+      </section>
+    </main>
+  )
+}
+
+function ApiKeySetup({ onConfigured }: { onConfigured: () => void }) {
+  const [apiKey, setApiKey] = useState('')
+  const [message, setMessage] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const saveApiKey = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextKey = apiKey.trim()
+    if (!nextKey) {
+      setMessage(apiKeyCopy.invalidKey)
+      return
+    }
+
+    setIsSaving(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/config/amap-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: nextKey }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || apiKeyCopy.saveFailed)
+      }
+      onConfigured()
+    } catch (error) {
+      setMessage((error as Error).message || apiKeyCopy.saveFailed)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <main className="api-key-setup-shell">
+      <section className="api-key-setup-panel">
+        <div className="api-key-brand-block">
+          <h1>{apiKeyCopy.appTitle}</h1>
+          <p>{apiKeyCopy.setupTitle}</p>
+        </div>
+        <p className="api-key-setup-body">{apiKeyCopy.setupBody}</p>
+        <form className="api-key-form" onSubmit={saveApiKey}>
+          <label>
+            <span>{apiKeyCopy.keyLabel}</span>
+            <input
+              type="password"
+              value={apiKey}
+              placeholder={apiKeyCopy.keyPlaceholder}
+              autoFocus
+              autoComplete="off"
+              onChange={(event) => setApiKey(event.target.value)}
+            />
+          </label>
+          {message && <p className="api-key-message">{message}</p>}
+          <button type="submit" disabled={isSaving}>{isSaving ? apiKeyCopy.saving : apiKeyCopy.save}</button>
+        </form>
+      </section>
+    </main>
+  )
+}
+
 function App() {
+  const [status, setStatus] = useState<ApiKeyGateStatus>('checking')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const checkApiKey = useCallback(async () => {
+    setStatus('checking')
+    setErrorMessage('')
+
+    try {
+      const response = await fetch('/api/config/amap-key')
+      const payload = (await response.json()) as { configured?: boolean }
+      setStatus(response.ok && payload.configured ? 'ready' : 'missing')
+    } catch (error) {
+      setErrorMessage((error as Error).message || apiKeyCopy.saveFailed)
+      setStatus('error')
+    }
+  }, [])
+
+  useEffect(() => {
+    void checkApiKey()
+  }, [checkApiKey])
+
+  if (isReadonlyDemoMode) {
+    return <MainApp />
+  }
+
+  if (status === 'checking') {
+    return <ApiKeyStatusShell title={apiKeyCopy.checkingTitle} body={apiKeyCopy.checkingBody} />
+  }
+
+  if (status === 'missing') {
+    return <ApiKeySetup onConfigured={() => setStatus('ready')} />
+  }
+
+  if (status === 'error') {
+    return (
+      <ApiKeyStatusShell
+        title={apiKeyCopy.errorTitle}
+        body={errorMessage || apiKeyCopy.saveFailed}
+        action={<button type="button" onClick={checkApiKey}>{apiKeyCopy.retry}</button>}
+      />
+    )
+  }
+
+  return <MainApp />
+}
+
+function MainApp() {
   const {
     tripReview,
     setTripReview,

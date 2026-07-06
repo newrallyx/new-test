@@ -24,11 +24,12 @@ function uniquePaths(paths) {
   return result
 }
 
-export function loadBackendEnv() {
+export function loadBackendEnv(extraPaths = []) {
   const projectRoot = path.resolve(__dirname, '..', '..')
   const cwd = process.cwd()
 
   const candidates = uniquePaths([
+    ...extraPaths,
     path.join(projectRoot, '.env'),
     path.join(projectRoot, '.env.local'),
     path.join(cwd, '.env'),

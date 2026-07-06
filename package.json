@@ -10,7 +10,9 @@
     "test": "node --test tests/*.test.js",
     "dev:frontend": "vite",
     "dev:backend": "node backend/src/index.js",
-    "start:backend": "node backend/src/index.js"
+    "start:backend": "node backend/src/index.js",
+    "desktop": "npm run build && electron .",
+    "dist:win": "npm run build && set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/&& set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/&& electron-builder --win"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -27,6 +29,36 @@
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.6.2",
     "vite": "^5.4.8",
-    "concurrently": "^9.1.2"
-  }
+    "concurrently": "^9.1.2",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "main": "electron/main.mjs",
+  "build": {
+    "appId": "com.local.roadtrip-retrospective-tool",
+    "productName": "旅行轨迹记录与规划工具",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "backend/**/*",
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "description": "Desktop app for roadtrip route recording and planning.",
+  "author": "Local User"
 }

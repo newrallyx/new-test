@@ -1,22 +1,22 @@
 @echo off
-title 旅行轨迹记录软件 - 关闭程序
+title ���й켣��¼���� - �رճ���
 
 echo ======================================
-echo   旅行轨迹记录软件 - 关闭程序
+echo   ���й켣��¼���� - �رճ���
 echo ======================================
 echo.
 
-echo 正在关闭后端服务（3001）...
+echo ���ڹرպ�˷���3001��...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3001 ^| findstr LISTENING') do (
     taskkill /PID %%a /F >nul 2>nul
 )
 
-echo 正在关闭前端服务（5173）...
+echo ���ڹر�ǰ�˷���5173��...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173 ^| findstr LISTENING') do (
     taskkill /PID %%a /F >nul 2>nul
 )
 
 echo.
-echo [完成] 已尝试关闭前后端服务
+echo [���] �ѳ��Թر�ǰ��˷���
 echo.
 pause

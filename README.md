@@ -1,975 +1,242 @@
-﻿# 鏃呰杞ㄨ抗璁板綍杞欢锛堣缁?README锛?
+# Travel Route Record and Planning Tool
 
-## 涓€銆佽繖浠戒唬鐮佹槸鍋氫粈涔堢殑
+> &#x65C5;&#x884C;&#x8F68;&#x8FF9;&#x8BB0;&#x5F55;&#x4E0E;&#x89C4;&#x5212;&#x5DE5;&#x5177;
 
-杩欐槸涓€涓熀浜?**React + TypeScript + Vite + Leaflet + Express** 寮€鍙戠殑鏃呰杞ㄨ抗璁板綍宸ュ叿銆?
+This project is a React, TypeScript, Vite, Leaflet, and Express application for recording and planning travel routes. It organizes a trip into trips, days, and route segments, then displays route geometry, distances, waypoints, notes, and segment scores on a map.
 
-瀹冪殑鏍稿績鐢ㄩ€斾笉鏄崟绾€滅湅鍦板浘鈥濓紝鑰屾槸鎶婁竴娆℃梾琛屾媶鎴愶細
+The app currently supports two workspaces:
 
-- **鏃呯▼锛圱rip锛?*
-- **鏃ユ湡锛圖ay锛?*
-- **璺锛圫egment锛?*
+- Review: record routes that have already been travelled.
+- Plan: prepare future routes before a trip.
 
-鐒跺悗鍥寸粫姣忎竴娈佃矾绋嬭褰曪細
+## Quick Start
 
-- 璧风偣 / 缁堢偣
-- 閫旂粡鐐?
-- 璺嚎绫诲瀷锛堥┚杞?/ 楠戣锛?
-- 璺嚎绛栫暐锛堝綋鍓嶄唬鐮佷腑涓衡€滈珮閫熶紭鍏?/ 閬垮厤鏀惰垂鈥濓級
-- 瀹為檯瑙勫垝鍑虹殑杞ㄨ抗鎶樼嚎
-- 璺閲岀▼銆佸綋鏃ユ€婚噷绋嬨€佹梾绋嬫€婚噷绋?
+### Requirements
 
-鍚屾椂锛岄」鐩凡缁忔敮鎸佷袱绫诲伐浣滃尯锛?
+- Windows
+- Node.js 20 LTS or newer
+- npm
+- An AMap Web Service API key for place suggestions and route planning
 
-- **澶嶇洏锛坮eview锛?*锛氶€傚悎璁板綍宸茬粡璧拌繃鐨勮矾绾?
-- **瑙勫垝锛坧lan锛?*锛氶€傚悎鎻愬墠鍋氳绋嬭鍒?
-
----
-
-鏈」鐩洰鍓嶆渶閫傚悎鐨勪娇鐢ㄦ柟寮忔槸锛?
-鍦?Windows 鐢佃剳涓婂弻鍑?`.bat` 鏂囦欢杩愯銆?*
-
-涓嶉渶瑕佽嚜宸辩爺绌跺墠鍚庣鍚姩鍛戒护锛屽彧闇€瑕佹寜涓嬮潰姝ラ鍋氬嵆鍙€?
-
-### 1. 鐢佃剳闇€瑕佸噯澶囩殑鐜
-
-鑷冲皯闇€瑕侊細
-
-- Windows 绯荤粺
-- **Node.js 20 LTS 鎴栨洿楂樼増鏈?*
-- 鑳借仈缃戝畨瑁?npm 渚濊禆
-
-瀹夎 Node.js 鍚庯紝鏈€濂藉厛鎵撳紑鍛戒护琛岋紝妫€鏌ヨ繖涓や釜鍛戒护鏄惁鍙敤锛?
+Check Node.js and npm:
 
 ```bash
 node -v
 npm -v
 ```
 
-鍙閮借兘姝ｅ父鏄剧ず鐗堟湰鍙凤紝灏辫鏄庣幆澧冨熀鏈病闂銆?
+### First Run On Windows
 
+From the project root, double-click:
 
-### 3. 绗竴娆′娇鐢?
+```text
+棣栨鍒濆鍖?bat
+```
 
-绗竴娆℃墦寮€鏃讹細
+After initialization finishes, double-click:
 
-1. 瑙ｅ帇椤圭洰鍘嬬缉鍖?
-2. 杩涘叆椤圭洰鏍圭洰褰?
-3. 鍙屽嚮 **`棣栨鍒濆鍖?bat`**
-4. 绛夊緟渚濊禆瀹夎瀹屾垚
-5. 鍐嶅弻鍑?**`鍚姩绋嬪簭.bat`**
+```text
+鍚姩绋嬪簭.bat
+```
 
-杩欏鑴氭湰浼氳嚜鍔ㄥ畬鎴愪笅闈㈣繖浜涗簨锛?
+The app starts the frontend and backend, then opens:
 
-- 妫€鏌ュ綋鍓嶇洰褰曟槸涓嶆槸椤圭洰鏍圭洰褰?
-- 妫€鏌?`backend/src/index.js` 鏄惁瀛樺湪
-- 妫€鏌?Node.js / npm 鏄惁瀹夎
-- 鑷姩鎵ц `npm install`
-- 鍒嗗埆鎵撳紑鍓嶇銆佸悗绔獥鍙?
-- 鑷姩鎵撳紑娴忚鍣ㄨ闂?`http://localhost:5173`
+```text
+http://localhost:5173
+```
 
-### 4. 浠ュ悗鎬庝箞鍚姩
+### Daily Startup
 
-鍒濆鍖栧畬鎴愬悗锛屽钩鏃跺彧闇€瑕佸弻鍑伙細
+- `鍚姩绋嬪簭.bat`: start both frontend and backend
+- `鍏抽棴绋嬪簭.bat`: stop local services
+- `鍚姩鍓嶇.bat`: start only the frontend
+- `鍚姩鍚庣.bat`: start only the backend
 
-- **`鍚姩绋嬪簭.bat`**锛氬惎鍔ㄦ暣涓▼搴?
-- **`鍏抽棴绋嬪簭.bat`**锛氬叧闂墠鍚庣鏈嶅姟
+## Environment Variables
 
-濡傛灉鍙槸璋冭瘯锛屼篃鍙互鍗曠嫭鍙屽嚮锛?
-
-- **`鍚姩鍓嶇.bat`**
-- **`鍚姩鍚庣.bat`**
-
-
-
----
-
-## 涓夈€佸疄闄呬娇鐢ㄦ椂鐨勬渶绠€璇存槑
-
-
-### 浣跨敤姝ラ
-
-1. 鍏堝畨瑁?Node.js 20 浠ヤ笂鐗堟湰銆?
-2. 瑙ｅ帇鏁翠釜椤圭洰鏂囦欢澶广€?
-3. 绗竴娆″厛鍙屽嚮 `棣栨鍒濆鍖?bat`銆?
-4. 鍒濆鍖栧畬鎴愬悗锛屽弻鍑?`鍚姩绋嬪簭.bat`銆?
-5. 娴忚鍣ㄤ細鑷姩鎵撳紑 `http://localhost:5173`銆?
-6. 鐢ㄥ畬鍚庡弻鍑?`鍏抽棴绋嬪簭.bat` 鍏抽棴绋嬪簭銆?
-
-### 濡傛灉鎵撲笉寮€
-
-浼樺厛妫€鏌ワ細
-
-- 鏈夋病鏈夊畨瑁?Node.js
-- `node -v` 鍜?`npm -v` 鑳戒笉鑳借繍琛?
-- 椤圭洰鏂囦欢澶规槸涓嶆槸瀹屾暣
-- 鏈夋病鏈夎鍒?`backend`銆乣src` 鎴栧嚑涓?`.bat` 鏂囦欢
-
----
-
-## 鍥涖€佺幆澧冨彉閲忎笌楂樺痉 Key 閰嶇疆
-
-杩欎釜椤圭洰褰撳墠浣跨敤鐨勬槸 **楂樺痉 Web 鏈嶅姟 API + 鍚庣浠ｇ悊** 鐨勬ā寮忋€?
-
-### 1. 涓轰粈涔堜竴瀹氳鏈?Key
-
-鍥犱负涓嬮潰杩欎簺鍔熻兘閮戒緷璧栭珮寰凤細
-
-- 鍦板悕鑱旀兂
-- 椹捐溅璺緞瑙勫垝
-- 楠戣璺緞瑙勫垝
-
-### 2. 鎺ㄨ崘鐨勯厤缃柟寮?
-
-椤圭洰鏍圭洰褰曟彁渚涗簡 `.env.example`锛屾帹鑽愬鍒朵负 `.env.local` 鍚庡～鍐欙細
+Copy `.env.example` to `.env.local`, then fill in your AMap key:
 
 ```bash
-AMAP_WEB_API_KEY=浣犵殑楂樺痉Web鏈嶅姟Key
+AMAP_WEB_API_KEY=your-amap-web-service-key
 BACKEND_PORT=3001
 VITE_BACKEND_BASE_URL=http://localhost:3001
 VITE_APP_MODE=normal
 ```
 
-鍚庣浼氭寜涓嬮潰浼樺厛绾ц鍙?Key锛?
+The backend reads AMap keys in this order:
 
 1. `AMAP_WEB_API_KEY`
 2. `AMAP_WEB_KEY`
 3. `AMAP_KEY`
 
+The key is used only by the backend proxy and is not exposed directly to the browser.
 
-## 浜斻€佸懡浠よ鍚姩鏂瑰紡锛堢粰浼氫竴鐐瑰紑鍙戠殑浜猴級
+## Development Commands
 
-濡傛灉涓嶆槸鍙屽嚮 bat锛岃€屾槸鍛戒护琛屽惎鍔紝鍙互杩欐牱锛?
-
-### 1. 瀹夎渚濊禆
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-### 2. 鍚屾椂鍚姩鍓嶅悗绔?
+Start frontend and backend together:
 
 ```bash
 npm run dev
 ```
 
-### 3. 鎴栧垎鍒惎鍔?
-
-鍚庣锛?
-
-```bash
-npm run dev:backend
-```
-
-鍓嶇锛?
+Start only the frontend:
 
 ```bash
 npm run dev:frontend
 ```
 
-### 4. 鏋勫缓鍓嶇
+Start only the backend:
+
+```bash
+npm run dev:backend
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Build for production:
 
 ```bash
 npm run build
 ```
 
-### 5. 鏈湴棰勮鏋勫缓缁撴灉
+Preview the production build:
 
 ```bash
 npm run preview
 ```
 
-### 6. 杩愯娴嬭瘯
+## Features
+
+- Create, edit, delete, and reorder trips.
+- Organize routes by workspace, trip, day, and segment.
+- Edit segment name, date, start point, end point, and waypoints.
+- Use AMap services for place suggestions and route planning.
+- Support driving and cycling route types.
+- Display one segment, one day, one trip, or all trips on the map.
+- Track segment, day, and trip distances.
+- Store scenic score, difficulty score, and notes for route segments.
+- Color routes by score mode.
+- Support readonly demo mode.
+- Export local backups that include trip data and route-cache records.
+
+## Readonly Demo Mode
+
+Readonly demo mode is useful for public demos and static deployment.
+
+Run locally:
 
 ```bash
-npm run test
+VITE_APP_MODE=readonly-demo npm run dev:frontend
 ```
 
----
+Build:
 
-## 鍏€侀」鐩綋鍓嶆敮鎸佺殑鏍稿績鍔熻兘
+```bash
+VITE_APP_MODE=readonly-demo npm run build
+```
 
-鏍规嵁褰撳墠浠ｇ爜锛屽凡缁忓疄鐜扮殑涓昏鍔熻兘鍖呮嫭锛?
-
-### 1. 鏃呯▼绠＄悊
-
-- 鏂板鏃呯▼
-- 缂栬緫鏃呯▼鍚嶇О銆佸紑濮嬫棩鏈熴€佺粨鏉熸棩鏈?
-- 鍒犻櫎鏃呯▼
-- 鏃呯▼涓婁笅绉诲姩鎺掑簭
-- 鎸夊伐浣滃尯鍖哄垎涓衡€滃鐩?/ 瑙勫垝鈥?
-
-### 2. 璺绠＄悊
-
-- 涓烘煇涓梾绋嬨€佹煇涓€澶╂柊澧炶矾娈?
-- 缂栬緫璺鍚嶇О
-- 淇敼璺鎵€灞炴棩鏈?
-- 鍒犻櫎璺
-- 鍦ㄥ悓涓€澶╁唴瀵硅矾娈典笂绉?/ 涓嬬Щ
-
-### 3. 璧风粓鐐逛笌閫旂粡鐐圭紪杈?
-
-- 璧风偣銆佺粓鐐规敮鎸佽緭鍏ュ湴鍚嶅苟鑱旀兂
-- 閫旂粡鐐规敮鎸佹柊澧炪€佸垹闄ゃ€佷笂绉汇€佷笅绉?
-- 鏀寔鍦ㄥ湴鍥句腑瀹氫綅鏌愪釜閫旂粡鐐?
-- 鏀寔鎶婃悳绱㈢粨鏋滃啓鍥炲潗鏍?
-
-### 4. 鍦板浘杞ㄨ抗瑙勫垝涓庡睍绀?
-
-- 浣跨敤楂樺痉杩涜椹捐溅璺嚎瑙勫垝
-- 鏀寔楠戣璺嚎瑙勫垝
-- 褰撳墠浠ｇ爜涓殑璺嚎绛栫暐涓猴細
-  - 楂橀€熶紭鍏?
-  - 閬垮厤鏀惰垂
-- 鍦板浘鏀寔鍗曟潯璺銆佸崟鏃ュ叏閮ㄨ矾娈点€佸崟鏃呯▼鍏ㄩ儴璺銆佸叏閮ㄦ梾绋嬫€昏
-
-### 5. 璺濈缁熻
-
-- 鍗曟潯杞ㄨ抗閲岀▼
-- 褰撴棩鎬婚噷绋?
-- 鏃呯▼鎬婚噷绋?
-- 濡傛灉楂樺痉娌＄洿鎺ヨ繑鍥為噷绋嬶紝浼氬洖閫€涓烘牴鎹姌绾跨偣璁＄畻杩戜技璺濈
-
-### 6. 鏈湴鎸佷箙鍖?
-
-- 鏃呯▼缁撴瀯淇濆瓨鍦?`localStorage`
-- 澶т綋绉建杩圭偣淇濆瓨鍦?`IndexedDB`
-- 閲嶅惎娴忚鍣ㄥ悗浠嶅彲璇诲彇
-
-### 7. 鍙婕旂ず妯″紡
-
-- 浠庨潤鎬?JSON 璇诲彇婕旂ず鏁版嵁
-- 绂佹鍐欐搷浣?
-- 閫傚悎閮ㄧ讲鎴愬睍绀虹綉椤?
-
----
-
-## 涓冦€侀」鐩洰褰曠粨鏋勮鏄?
-
-涓嬮潰鏄繖浠戒唬鐮佺殑鍏抽敭鐩綍璇存槑銆?
+Demo data is loaded from:
 
 ```text
-project-root/
-鈹溾攢 backend/                    # Express 鍚庣锛岃礋璐ｄ唬鐞嗛珮寰?API
-鈹? 鈹斺攢 src/
-鈹?    鈹溾攢 app.js                # 鍒涘缓 Express 搴旂敤銆佹敞鍐岃矾鐢?
-鈹?    鈹溾攢 index.js              # 鍚庣鍚姩鍏ュ彛
-鈹?    鈹溾攢 env.js                # 鐜鍙橀噺鍔犺浇涓?Key 瑙ｆ瀽
-鈹?    鈹溾攢 amapInputTipsProxy.js # 楂樺痉杈撳叆鎻愮ず浠ｇ悊
-鈹?    鈹溾攢 amapDirectionProxy.js # 楂樺痉椹捐溅璺嚎浠ｇ悊
-鈹?    鈹斺攢 amapCyclingDirectionProxy.js # 楂樺痉楠戣璺嚎浠ｇ悊
-鈹?
-鈹溾攢 src/                        # 鍓嶇涓讳唬鐮?
-鈹? 鈹溾攢 components/              # UI 缁勪欢
-鈹? 鈹溾攢 hooks/                   # 涓氬姟鐘舵€?Hook
-鈹? 鈹溾攢 services/                # 瀛樺偍銆佸湴鍥炬帴鍙ｃ€佹紨绀烘暟鎹浉鍏虫湇鍔?
-鈹? 鈹溾攢 utils/                   # 宸ュ叿鍑芥暟
-鈹? 鈹溾攢 config/                  # 搴旂敤妯″紡閰嶇疆
-鈹? 鈹溾攢 demo/                    # 婕旂ず鏁版嵁瀵煎嚭宸ュ叿
-鈹? 鈹溾攢 types/                   # 绫诲瀷瀹氫箟
-鈹? 鈹溾攢 App.tsx                  # 鍓嶇鎬绘帶缁勪欢
-鈹? 鈹斺攢 main.tsx                 # 鍓嶇鍏ュ彛
-鈹?
-鈹溾攢 scripts/
-鈹? 鈹斺攢 split-demo-data.mjs      # 婕旂ず鏁版嵁鎷嗗垎鑴氭湰
-鈹?
-鈹溾攢 tests/
-鈹? 鈹斺攢 amapInputTipsProxy.test.js # 杈撳叆鎻愮ず浠ｇ悊娴嬭瘯
-鈹?
-鈹溾攢 鍚姩绋嬪簭.bat
-鈹溾攢 鍚姩鍓嶇.bat
-鈹溾攢 鍚姩鍚庣.bat
-鈹溾攢 棣栨鍒濆鍖?bat
-鈹溾攢 鍏抽棴绋嬪簭.bat
-鈹溾攢 package.json
-鈹溾攢 vite.config.ts
-鈹斺攢 .env.example
+public/demo-data/manifest.json
+public/demo-data/part-01.json
 ```
 
----
+To split a larger demo-data file into chunks:
 
-## 鍏€佷唬鐮佽缁嗗垎鏋?
+```bash
+node scripts/split-demo-data.mjs
+```
 
-涓嬮潰杩欎竴閮ㄥ垎閲嶇偣涓嶆槸鈥滄€庝箞杩愯鈥濓紝鑰屾槸鈥滆繖浠戒唬鐮佹湰韬槸鎬庝箞缁勭粐鐨勨€濄€?
+By default, the script reads:
 
----
+```text
+backup/demo-data.json
+```
 
-### 1. 鍓嶇鎬绘帶锛歚src/App.tsx`
+You can also pass a custom source file:
 
-杩欐槸鏁翠釜鍓嶇鐨勬€昏皟搴︿腑蹇冦€?
+```bash
+node scripts/split-demo-data.mjs path/to/demo-data.json
+```
 
-瀹冭礋璐ｅ仛鍑犱欢鍏抽敭鐨勪簨锛?
+## Data Storage
 
-#### 锛?锛夌淮鎶ゅ簲鐢ㄧ骇鐘舵€?
+In normal mode, data is stored locally in the browser:
 
-涓昏鐘舵€佸寘鎷細
+- Trip metadata is stored in `localStorage`.
+- Large route geometry is cached in `IndexedDB`.
 
-- 褰撳墠宸ヤ綔鍖猴細`review` / `plan`
-- 褰撳墠绛涢€夋潯浠讹細`tripId / dayId / segmentId`
-- 褰撳墠鏄惁姝ｅ湪缂栬緫鏌愭潯璺
-- 褰撳墠鏄惁姝ｅ湪缂栬緫閫旂粡鐐?
-- 褰撳墠鏄惁姝ｅ湪缂栬緫璧风粓鐐?
-- 褰撳墠鏄惁鎵撳紑鏃呯▼绠＄悊寮圭獥
+This avoids putting large polyline data directly into `localStorage`.
 
-#### 锛?锛変覆鑱斿嚑涓牳蹇?Hook
+The backup export button creates a JSON file containing:
 
-`App.tsx` 骞舵病鏈夋妸鎵€鏈夐€昏緫閮藉爢鍦ㄨ嚜宸卞唴閮紝鑰屾槸鎶婁笉鍚岃亴璐ｆ媶缁欎笉鍚?Hook锛?
+- Trip, day, and segment data.
+- IndexedDB route-cache records.
+- Export timestamp and summary counts.
 
-- `useTripReviewState()`锛氳礋璐ｆ€绘暟鎹姞杞戒笌淇濆瓨
-- `useFilteredSegments()`锛氭牴鎹瓫閫夋潯浠惰绠楀綋鍓嶈灞曠ず鐨勮矾娈?
-- `useRouteCacheHydration()`锛氭妸 IndexedDB 涓紦瀛樼殑璺嚎鐐归噸鏂版敞鍏ュ埌鍐呭瓨鐘舵€?
-- `useTripManager()`锛氳礋璐ｆ柊澧炪€佸垹闄ゃ€佹洿鏂版梾绋嬪拰璺
-- `useSegmentEditing()`锛氳礋璐ｈ矾娈佃鎯呯紪杈戙€侀€旂粡鐐圭紪杈戙€佽捣缁堢偣缂栬緫
+## Project Structure
 
-杩欑鍐欐硶鐨勪紭鐐规槸锛?
+```text
+backend/             Express backend and AMap proxy routes
+public/demo-data/    Readonly demo-data chunks
+scripts/             Data processing scripts
+src/components/      React UI components
+src/hooks/           Business state hooks
+src/services/        Storage, map, backup, and demo-data services
+src/styles/          CSS files
+src/types/           TypeScript domain types
+src/utils/           Shared utility functions
+tests/               Backend proxy tests
+```
 
-- `App.tsx` 铏界劧澶э紝浣嗕粛鐒舵槸鈥滅紪鎺掑眰鈥濓紝涓嶆槸鎵€鏈変笟鍔＄粏鑺傞兘濉炲湪涓€涓枃浠堕噷
-- 鍚庣画缁х画鎵╁睍鏃讹紝鍙互缁х画娌跨潃 Hook 鍒嗗眰鐨勬柟寮忚凯浠?
+## Troubleshooting
 
-#### 锛?锛夊喅瀹氶〉闈笁澶у尯鍩熺殑鏁版嵁鏉ユ簮
+### Place suggestions or route planning do not work
 
-椤甸潰鍩烘湰鍙互鐪嬫垚涓夊潡锛?
+Check that:
 
-1. `TripEditor`锛氭柊澧炴梾绋嬨€佹柊澧炶矾娈?
-2. `FilterPanel`锛氱瓫閫夊尯
-3. `MapPlaceholder + MapPanel`锛氳矾娈佃鎯呭尯 + 鐪熸鍦板浘鍖?
+- `.env.local` exists.
+- `AMAP_WEB_API_KEY` is set correctly.
+- The backend service is running.
+- Services were restarted after changing environment variables.
 
-`App.tsx` 璐熻矗鎶婂綋鍓嶅伐浣滃尯銆佸綋鍓嶇瓫閫夈€佸綋鍓嶆椿璺冭矾娈点€佸綋鍓嶇粺璁＄粨鏋滅粺涓€绠楀ソ锛屽啀浼犵粰瀛愮粍浠躲€?
+### The browser page does not open
 
-#### 锛?锛夎绠楁€昏淇℃伅
+Check that:
 
-姣斿锛?
+- Node.js is installed.
+- `npm install` has been run.
+- Port `5173` is not occupied.
+- Port `3001` is not occupied.
 
-- 褰撳墠鏃呯▼鎬婚噷绋?
-- 褰撳墠鏃ユ湡鎬婚噷绋?
-- 褰撳墠鍦板浘涓婃樉绀虹殑璺鏁?
-- 褰撳墠鍦板浘淇℃伅鏍忔枃瀛?
+### The map does not show a route
 
-杩欎簺閮藉湪 `App.tsx` 閲岀粺涓€鐢?`useMemo` 璁＄畻锛岄伩鍏嶆瘡涓瓙缁勪欢閲嶅绠椾竴閬嶃€?
+Possible causes:
 
----
+- The start or end coordinate is missing.
+- AMap API quota is exhausted or the upstream request failed.
+- No route is available for the selected conditions.
+- Readonly demo data does not include cached route points.
 
-### 2. 棰嗗煙妯″瀷锛歚src/types/trip.ts`
+## Tech Stack
 
-杩欎釜鏂囦欢瀹氫箟浜嗘暣濂楁暟鎹ā鍨嬶紝鏄暣涓」鐩渶鏍稿績鐨勨€滄暟鎹害瀹氣€濄€?
-
-涓昏缁撴瀯濡備笅锛?
-
-#### `TripReview`
-
-鏍瑰璞★紝鍙湁涓€涓瓧娈碉細
-
-- `trips: Trip[]`
-
-#### `Trip`
-
-琛ㄧず涓€娆″畬鏁存梾绋嬶紝鍖呭惈锛?
-
-- `id`
-- `title`
-- `category`锛歚review` 鎴?`plan`
-- `order`
-- `startDate`
-- `endDate`
-- `days`
-
-#### `TripDay`
-
-琛ㄧず鏃呯▼涓殑涓€澶╋紝鍖呭惈锛?
-
-- `id`
-- `date`
-- `routeSegments`
-
-#### `RouteSegment`
-
-琛ㄧず涓€娈佃矾绾匡紝鏄渶閲嶈鐨勬暟鎹璞★紝鍖呭惈锛?
-
-- 璺鍚嶇О
-- 璧风偣 / 缁堢偣鏂囨湰
-- 璧风粓鐐瑰潗鏍?
-- 閫旂粡鐐瑰垪琛?
-- 璺嚎绫诲瀷
-- 璺嚎鍋忓ソ
-- 杞ㄨ抗鐐?`points`
-- 閲岀▼ `distanceMeters`
-- 璺嚎绛惧悕 `routeBuildKey`
-
-杩欎釜妯″瀷璁捐寰楁瘮杈冨悎鐞嗭紝鍥犱负瀹冩妸锛?
-
-- 鈥滅敤鎴疯緭鍏ョ殑鏂囨湰鈥?
-- 鈥滆В鏋愬悗鐨勫潗鏍団€?
-- 鈥滅湡姝ｇ敓鎴愬嚭鏉ョ殑鎶樼嚎鈥?
-
-涓夊眰淇℃伅鍒嗗紑淇濆瓨浜嗐€傚悗缁笉绠℃槸閲嶆柊瑙勫垝銆佺紦瀛樻牎楠屻€佸鍑烘紨绀烘暟鎹紝閮戒細姣旇緝鏂逛究銆?
-
----
-
-### 3. 鏁版嵁鎸佷箙鍖栵細`src/services/tripStorage.ts`
-
-杩欎釜鏂囦欢璐熻矗 `localStorage` 鐨勮鍐欍€?
-
-瀹冨仛寰楁瘮杈冨ソ鐨勫湴鏂规湁涓夌偣锛?
-
-#### 锛?锛夌粺涓€鍏ュ彛
-
-缁勪欢鏈韩涓嶇洿鎺ユ搷浣?`localStorage`锛岃€屾槸缁熶竴璧帮細
-
-- `loadTripReview()`
-- `saveTripReview()`
-- `toPersistedTripReview()`
-
-杩欐牱鍚庨潰濡傛灉浣犳兂鎹㈡垚鍒殑瀛樺偍鏂瑰紡锛屼笉闇€瑕佸叏椤圭洰鍒板鏀广€?
-
-#### 锛?锛夊仛浜嗘棫鏁版嵁鍏煎
-
-浠ｇ爜閲屽吋瀹逛簡鏃х増鏈殑 `viaPointsText`锛屼細鑷姩鎶婂畠杞崲鎴愭柊鐨?`waypoints` 缁撴瀯銆?
-
-杩欒鏄庤繖涓」鐩凡缁忎笉鏄€滀粠闆朵竴娆℃垚鍨嬧€濓紝鑰屾槸鍦ㄨ凯浠ｈ繃绋嬩腑鑰冭檻浜嗗巻鍙叉暟鎹縼绉汇€?
-
-#### 锛?锛夋妸澶ц建杩圭偣浠?localStorage 涓墺绂诲嚭鍘?
-
-褰撳墠浠ｇ爜浼氭晠鎰忔妸 `points` 璁句负 `undefined` 鍐嶄繚瀛樺埌 `localStorage`銆?
-
-鍘熷洜寰堟槑纭細
-
-- 璺嚎鎶樼嚎鐐瑰緢澶?
-- 鍏ㄩ儴濉炶繘 `localStorage` 寰堝鏄撹秴闄?
-- 鎵€浠ユ妸缁撴瀯鍖栧厓鏁版嵁鐣欏湪 `localStorage`
-- 鎶婂ぇ浣撶Н鎶樼嚎鍗曠嫭鏀捐繘 `IndexedDB`
-
-杩欐槸杩欎唤浠ｇ爜閲屼竴涓緢鍏抽敭銆佷篃姣旇緝鎴愮啛鐨勮璁＄偣銆?
-
----
-
-### 4. 杞ㄨ抗缂撳瓨锛歚src/services/routeCacheDb.ts`
-
-杩欎釜鏂囦欢璐熻矗 `IndexedDB` 灞傞潰鐨勮矾绾跨紦瀛樸€?
-
-瀹冨疄鐜颁簡锛?
-
-- `saveSegmentRouteCache()`锛氫繚瀛樻煇娈佃矾绾挎姌绾?
-- `getSegmentRouteCache()`锛氳鍙栨煇娈佃矾绾挎姌绾?
-- `deleteSegmentRouteCache()`锛氬垹闄ゆ煇娈佃矾绾跨紦瀛?
-- `clearAllRouteCache()`锛氭竻绌哄叏閮ㄧ紦瀛?
-
-杩欓噷鐨勮璁＄洰鐨勯潪甯告槑纭細
-
-- **鍑忓皯楂樺痉 API 璋冪敤娆℃暟**
-- **鍑忓皯姣忔鎵撳紑椤甸潰鏃堕噸鏂拌鍒掓墍鏈夎建杩圭殑寮€閿€**
-- **閬垮厤娴忚鍣?localStorage 浣撶Н鐖嗘帀**
-
-缂撳瓨璁板綍閲屼笉浠呬繚瀛?`segmentId`锛岃繕淇濆瓨 `routeBuildKey`銆?
-
-杩欏緢閲嶈锛屽洜涓哄畠淇濊瘉浜嗭細
-
-- 涓嶆槸鈥滃彧瑕?segmentId 鐩稿悓灏辩洿鎺ュ鐢ㄢ€?
-- 鑰屾槸鈥滃彧鏈夊綋鍓嶈捣缁堢偣 / 閫旂粡鐐?/ 璺嚎绫诲瀷 / 璺嚎绛栫暐涓庣紦瀛樻椂涓€鑷达紝鎵嶅鐢ㄦ棫杞ㄨ抗鈥?
-
-杩欏氨閬垮厤浜嗏€滅敤鎴锋敼浜嗚矾绾挎潯浠讹紝浣嗗湴鍥捐繕鏄剧ず鏃х嚎鈥濈殑閿欒銆?
-
----
-
-### 5. 搴旂敤妯″紡锛歚src/config/appMode.ts`
-
-杩欎釜鏂囦欢寰堝皬锛屼絾浣滅敤寰堝叧閿€?
-
-瀹冨畾涔変簡涓や釜妯″紡锛?
-
-- `normal`
-- `readonly-demo`
-
-涔熷氨鏄細
-
-- 骞虫椂鏈湴姝ｅ父缂栬緫妯″紡
-- 鍙灞曠ず妯″紡
-
-鍚庣画濡傛灉浣犵户缁崌绾ч」鐩紝杩欓噷杩樺彲浠ユ墿灞曞嚭鏇村妯″紡锛屾瘮濡傦細
-
-- `public-demo`
-- `self-hosted`
-- `desktop`
-
-鐩墠杩欏眰妯″紡闅旂宸茬粡鏈夐洀褰簡銆?
-
----
-
-### 6. 鏁版嵁鎬荤姸鎬?Hook锛歚src/hooks/useTripReviewState.ts`
-
-杩欎釜 Hook 璐熻矗鈥滃簲鐢ㄤ竴鍚姩锛屾暟鎹粠鍝噷鏉モ€濄€?
-
-#### 鍦?normal 妯″紡涓?
-
-- 鐩存帴浠?`localStorage` 璇诲彇
-- 骞跺湪鐘舵€佸彉鍖栧悗鑷姩淇濆瓨
-
-#### 鍦?readonly-demo 妯″紡涓?
-
-- 涓嶈 `localStorage`
-- 杞€岃鍙?`public/demo-data/manifest.json`
-- 鍐嶆妸澶氫釜鍒嗙墖 JSON 鍚堝苟鎴愪竴涓?`TripReview`
-
-杩欎釜璁捐璇存槑浣犵殑椤圭洰宸茬粡寮€濮嬪尯鍒嗭細
-
-- **缂栬緫鍨嬫暟鎹簮**
-- **婕旂ず鍨嬫暟鎹簮**
-
-瀵逛簬鍚庣画涓婄嚎灞曠ず鐗堬紝杩欐槸寰堥噸瑕佺殑涓€姝ャ€?
-
----
-
-### 7. 璺嚎缂撳瓨鍥炲～ Hook锛歚src/hooks/useRouteCacheHydration.ts`
-
-杩欎釜 Hook 鐨勪綔鐢ㄦ槸锛?
-
-- 搴旂敤鍔犺浇鍚?
-- 閫愪釜鎵弿褰撳墠鏃呯▼閲岀殑璺
-- 鍘?IndexedDB 鏌ユ湁娌℃湁缂撳瓨鎶樼嚎
-- 濡傛灉缂撳瓨鐨?`routeBuildKey` 涓庡綋鍓嶈矾娈靛尮閰?
-- 灏辨妸 `points` 鍥炲～鍒拌繍琛屾椂鐘舵€侀噷
-
-杩欎竴姝ュ疄闄呬笂瑙ｅ喅浜嗕竴涓潪甯哥幇瀹炵殑闂锛?
-
-> 鏃呯▼缁撴瀯瀛樺湪 `localStorage`锛岃建杩圭偣瀛樺湪 IndexedDB锛岄〉闈㈠惎鍔ㄦ椂濡備綍鎶婁袱杈规嫾鍥炲畬鏁寸姸鎬侊紵
-
-杩欎釜 Hook 灏辨槸鍦ㄥ仛杩欎欢浜嬨€?
-
-浠庡伐绋嬭搴︾湅锛岃繖灞炰簬鈥滃瓨鍌ㄥ眰鎷嗗垎鍚庡繀瑕佺殑鐘舵€侀噸寤洪€昏緫鈥濓紝鍋氬緱鏄鐨勩€?
-
----
-
-### 8. 绛涢€夎绠?Hook锛歚src/hooks/useFilteredSegments.ts`
-
-杩欎釜 Hook 寰堢函绮癸紝鍙仛涓€浠朵簨锛?
-
-- 鏍规嵁 `tripId / dayId / segmentId` 涓夌骇绛涢€夋潯浠?
-- 杈撳嚭褰撳墠搴旇灞曠ず鍝簺 `RouteSegment`
-
-瀹冪殑濂藉鏄細
-
-- 閫昏緫绠€鍗?
-- 鍙娴?
-- 瀹规槗璋冭瘯
-- 涓嶅拰 UI 娣峰湪涓€璧?
-
-瀵逛簬杩欑被鍒楄〃 / 绛涢€夊瀷椤甸潰锛岃繖绉嶁€滅函璁＄畻 Hook鈥濋潪甯稿€煎緱淇濈暀銆?
-
----
-
-### 9. 鏃呯▼涓庤矾娈电鐞?Hook锛歚src/hooks/useTripManager.ts`
-
-杩欐槸褰撳墠鍓嶇涓氬姟閫昏緫閲屾渶鏍稿績鐨勬枃浠朵箣涓€銆?
-
-瀹冨鐞嗙殑鑳藉姏寰堝锛屽寘鎷細
-
-- 鏌ユ壘鏌愭潯璺鎵€鍦ㄧ殑鏃呯▼ / 鏃ユ湡浣嶇疆
-- 鏂板鏃呯▼
-- 鏂板璺
-- 鏇存柊璺
-- 鏇存柊璺鍏冧俊鎭?
-- 鍒犻櫎璺
-- 鍒犻櫎鏃呯▼
-- 鏃呯▼涓婁笅绉诲姩
-- 璺涓婁笅绉诲姩
-- 鍙妯″紡鍐欏叆鎷︽埅
-
-#### 杩欎釜 Hook 鐨勪紭鐐?
-
-##### 锛?锛夊啓鎿嶄綔闆嗕腑
-
-鎵€鏈夆€滄敼鏁版嵁鈥濈殑鍔ㄤ綔锛屽熀鏈兘闆嗕腑鍦ㄨ繖閲岋紝鑰屼笉鏄垎鏁ｅ埌姣忎釜缁勪欢鍐呴儴銆?
-
-##### 锛?锛夊垹闄ゆ椂浼氬悓姝ユ竻缂撳瓨
-
-鍒犻櫎璺鎴栨梾绋嬫椂锛屼細璋冪敤 `deleteSegmentRouteCache()` 鍘绘竻鎺夊搴旇矾绾跨紦瀛樸€?
-
-杩欎竴鐐瑰緢濂斤紝鍥犱负瀹冮伩鍏嶄簡鏃犳晥鏃х紦瀛樻畫鐣欍€?
-
-##### 锛?锛夎矾娈佃法鏃ユ湡绉诲姩閫昏緫宸茬粡鑰冭檻鍒颁簡
-
-`updateSegmentMeta()` 閲岋紝濡傛灉鐢ㄦ埛鎶婅矾娈垫棩鏈熸敼鎴愬彟涓€澶╋細
-
-- 浼氫粠鍘熸潵鐨?day 涓Щ闄?
-- 鍐嶆彃鍏ョ洰鏍囨棩鏈熷搴旂殑 day
-- 濡傛灉鐩爣鏃ユ湡涓嶅瓨鍦紝浼氳嚜鍔ㄦ柊寤?day
-
-杩欒鏄庢暟鎹粨鏋勭殑鏀瑰姩閫昏緫宸茬粡姣旇緝瀹屾暣锛屼笉鏄畝鍗曗€滄敼涓瓧娈碘€濊€屽凡銆?
-
-#### 杩欎釜 Hook 鐨勪笉瓒?
-
-瀹冪幇鍦ㄥ凡缁忔瘮杈冮暱浜嗭紝缁х画澧炲姞涓氬姟鍚庯紝寤鸿浠ュ悗鍐嶆媶鎴愬嚑涓柟鍚戯細
-
-- `useTripCrud`
-- `useSegmentCrud`
-- `useTripOrdering`
-- `useReadonlyGuard`
-
-杩欐牱浼氭洿鍒╀簬闀挎湡缁存姢銆?
-
----
-
-### 10. 璺缂栬緫 Hook锛歚src/hooks/useSegmentEditing.ts`
-
-杩欎釜 Hook 鏇村亸鍚戔€滃綋鍓嶆椿鍔ㄨ矾娈电殑缂栬緫鐘舵€佺鐞嗏€濄€?
-
-瀹冧富瑕佽礋璐ｏ細
-
-- 褰撳墠娲诲姩璺鏃ユ湡
-- 褰撳墠灞曠ず鐨勯€旂粡鐐?
-- 褰撳墠閫変腑鐨勯€旂粡鐐?
-- 璧风粓鐐硅崏绋?
-- 璺鍚嶇О / 鏃ユ湡鑽夌
-- 杩涘叆缂栬緫 / 淇濆瓨缂栬緫 / 鍙栨秷缂栬緫
-
-瀹冩妸鈥滅紪杈戜腑鐨勪复鏃惰崏绋库€濆拰鈥滅湡姝ｄ繚瀛樺悗鐨勬暟鎹€濆尯鍒嗗紑浜嗭紝杩欎竴鐐瑰緢閲嶈銆?
-
-鍚﹀垯涓€杈硅緭鍏ャ€佷竴杈圭洿鎺ユ敼涓荤姸鎬侊紝寰堝鏄撳嚭鐜帮細
-
-- 杈撳叆涓柇
-- 鑱旀兂缁勪欢闂儊
-- 鍙栨秷缂栬緫鏃犳硶鍥炴粴
-- 鏁版嵁鍗婃敼鐘舵€?
-
-浣犺繖浠戒唬鐮佸湪杩欓噷宸茬粡鏈夋瘮杈冩竻鏅扮殑鑽夌灞傘€?
-
----
-
-### 11. 鍦板浘鏈嶅姟灞傦細`src/services/amap.ts`
-
-杩欐槸鏁翠釜椤圭洰鍙︿竴涓潪甯稿叧閿殑鏍稿績鏂囦欢銆?
-
-瀹冭礋璐ｆ妸鍓嶇瀵光€滃湴鍚嶈仈鎯斥€濆拰鈥滆矾绾胯鍒掆€濈殑闇€姹傜粺涓€灏佽璧锋潵銆?
-
-#### 瀹冨仛浜嗗摢浜涗簨
-
-##### 锛?锛夎緭鍏ユ彁绀虹紦瀛?
-
-- 浣跨敤鍐呭瓨 Map 鍋?LRU/TTL 寮忕紦瀛?
-- 鏈€澶氱紦瀛?200 鏉?
-- 榛樿 10 鍒嗛挓杩囨湡
-
-##### 锛?锛夎緭鍏ユ彁绀哄弻閫氶亾鏌ヨ
-
-`searchAmapInputTips()` 浼氬苟琛岃姹傦細
-
-- 琛屾斂鍖鸿仈鎯筹紙city锛?
-- 鏅€?POI 鑱旀兂锛坧oi锛?
-
-鐒跺悗鍚堝苟銆佸幓閲嶏紝骞舵妸琛屾斂鍖轰紭鍏堟樉绀恒€?
-
-濡傛灉鍚敤浜嗗煄甯傝寖鍥撮攣瀹氫笖缁撴灉澶皯锛岃繕浼氬啀鍙戜竴娆¤寖鍥村琛ュ厖鏌ヨ銆?
-
-杩欏閫昏緫璇存槑浣犲苟涓嶆槸鍙仛浜嗏€滄渶绠€鍗曠殑杈撳叆妗嗚姹傗€濓紝鑰屾槸宸茬粡鍦ㄤ紭鍖栧疄闄呴€夌偣浣撻獙銆?
-
-##### 锛?锛夎矾绾胯鍒掗槦鍒楅檺娴?
-
-杩欓噷鍋氫簡涓€涓緢鏈変环鍊肩殑浼樺寲锛?
-
-- 骞跺彂鏁伴檺鍒朵负 2
-- 姣忔璇锋眰鍓嶅欢杩?200ms
-- 鍛戒腑闄愭祦閿欒鍚庢殏鍋?3 绉掑啀缁х画
-
-杩欒兘鏄捐憲鍑忓皯澶ч噺璺鍚屾椂瑙勫垝鏃舵妸楂樺痉鎺ュ彛鎵撶垎鐨勯闄┿€?
-
-##### 锛?锛夎繘琛岃姹傚幓閲?
-
-瀵圭浉鍚岃矾绾挎潯浠剁殑璇锋眰锛屼細鍋?in-flight 鍘婚噸锛岄伩鍏嶅悓涓€鏉¤矾绾胯鐭椂闂撮噸澶嶈姹傚娆°€?
-
-##### 锛?锛夊唴瀛樼紦瀛樿矾绾?
-
-瑙勫垝杩囩殑璺嚎浼氬厛瀛樺湪鍓嶇鍐呭瓨 Map 閲岋紝濡傛灉鍙傛暟娌″彉锛屽彲浠ョ珛鍗冲鐢ㄣ€?
-
-##### 锛?锛夋敮鎸侀┚杞︿笌楠戣涓ょ被瑙勫垝
-
-- 椹捐溅锛氳蛋 `/api/amap/direction`
-- 楠戣锛氳蛋 `/api/amap/cycling-direction`
-
-鍏朵腑楠戣妯″紡浼氭妸澶氭 waypoint 璺嚎鎷嗘垚鑻ュ共灏忔閫愭瑙勫垝锛屽啀鎷兼帴 polyline銆?
-
-#### 杩欎竴灞傜殑鏁翠綋璇勪环
-
-杩欎笉鏄€滄紨绀虹骇鍒€濈殑鎺ュ彛璋冪敤鍐欐硶锛岃€屾槸宸茬粡鏈変簡涓€瀹氱湡瀹炰娇鐢ㄥ満鏅笅鐨勬€ц兘鍜岄厤棰濇剰璇嗐€?
-
-杩欐槸褰撳墠椤圭洰閲屾瘮杈冩垚鐔熺殑涓€閮ㄥ垎銆?
-
----
-
-### 12. 鍦板浘缁勪欢锛歚src/components/MapPanel.tsx`
-
-杩欐槸鍓嶇鏈€澶嶆潅鐨勭粍浠朵箣涓€锛岃礋璐ｇ湡姝ｇ殑鍦板浘娓叉煋涓庤建杩硅鍒掑睍绀恒€?
-
-瀹冧富瑕佸仛鐨勪簨鍖呮嫭锛?
-
-#### 锛?锛夋妸褰撳墠绛涢€夊埌鐨勮矾娈佃浆鎴愬湴鍥捐建杩?
-
-濡傛灉鏌愭璺嚎宸茬粡鏈夊彲澶嶇敤鐨勭紦瀛樻姌绾匡紝灏辩洿鎺ュ睍绀恒€?
-
-濡傛灉娌℃湁缂撳瓨锛?
-
-- 鍦ㄦ櫘閫氭ā寮忎笅浼氭寜闇€璋冪敤楂樺痉瑙勫垝
-- 鍦ㄥ彧璇绘ā寮忔垨鍏ㄥ眬鎬昏闄愬埗涓嬶紝浼氫紭鍏堝彧灞曠ず宸茬紦瀛樿建杩?
-
-#### 锛?锛夎嚜鍔ㄨˉ瑙ｆ瀽璧风粓鐐瑰潗鏍?
-
-濡傛灉璺鍙湁璧风粓鐐瑰悕绉帮紝娌℃湁鍧愭爣锛屼細鍏堢敤杈撳叆鎻愮ず鏈嶅姟灏濊瘯瑙ｆ瀽鍧愭爣鍚庡啀瑙勫垝銆?
-
-#### 锛?锛夊け璐ユ椂闄嶇骇涓虹洿绾?
-
-濡傛灉楂樺痉娌℃湁鎴愬姛杩斿洖 polyline锛岀粍浠朵細鐢ㄨ捣鐐?閫旂粡鐐?缁堢偣鐩存帴杩炴垚 fallback 鎶樼嚎銆?
-
-杩欐瘮鈥滅┖鐧戒笉鏄剧ず鈥濅綋楠屽ソ寰堝銆?
-
-#### 锛?锛変繚瀛樿建杩圭紦瀛?
-
-瑙勫垝鎴愬姛鍚庣殑鎶樼嚎浼氬啓鍏?IndexedDB銆?
-
-#### 锛?锛夋€昏妯″紡鑷姩鎶界█
-
-鍦ㄦ€昏瑙嗗浘閲岋紝浼氬杩囬暱鎶樼嚎杩涜 downsample锛岄檷浣庢覆鏌撳帇鍔涖€?
-
-杩欎篃鏄竴涓緢瀹為檯鐨勬€ц兘浼樺寲銆?
-
-#### 锛?锛夊湴鍥句氦浜掕緟鍔╂帶鍒跺櫒
-
-鏂囦欢涓繕鍐欎簡鍑犱釜鎺у埗鍣ㄥ紡灏忕粍浠讹細
-
-- `ViewportController`锛氭牴鎹建杩硅嚜鍔?fitBounds
-- `MapResizeController`锛氬鐞嗗昂瀵稿彉鍖栧鑷寸殑鍦板浘鍒锋柊闂
-- `WaypointFocusController`锛氳仛鐒﹀埌閫変腑鐨勯€旂粡鐐?
-
-杩欒鏄庝綘鍦ㄥ鐞?Leaflet 缁嗚妭鏃讹紝宸茬粡涓嶆槸鈥滃彧浼氱敾鍥惧眰鈥濓紝鑰屾槸寮€濮嬪鐞嗙湡瀹炰氦浜掗棶棰樹簡銆?
-
----
-
-### 13. 璺璇︽儏缁勪欢锛歚src/components/MapPlaceholder.tsx`
-
-杩欎釜缁勪欢涓嶆槸鍦板浘鏈韩锛岃€屾槸鍦板浘涓婃柟鐨勨€滆鎯呯紪杈戝尯鈥濄€?
-
-瀹冨湪涓ょ妯″紡闂村垏鎹細
-
-#### 锛?锛夋梾绋嬪垪琛ㄦā寮?
-
-褰撶瓫閫変负鈥滃叏閮ㄦ梾绋嬧€濇椂锛岃繖閲屾樉绀虹殑鏄梾绋嬪垪琛紝鑰屼笉鏄墍鏈夎矾娈佃鎯呫€?
-
-杩欏拰搴曢儴鐪熷疄鍦板浘鍖哄舰鎴愬垎宸ワ細
-
-- 涓婇潰鐪嬫梾绋嬬鐞嗕俊鎭?
-- 涓嬮潰鍦板浘浠嶇劧鍙互鐢诲叏閮ㄨ建杩规€昏
-
-#### 锛?锛夎矾娈佃鎯呮ā寮?
-
-褰撻€変腑鍏蜂綋鏃呯▼鍚庯紝杩欓噷浼氬睍绀猴細
-
-- 璺鍚嶇О鍒楄〃
-- 褰撳墠娲诲姩璺鍏冧俊鎭?
-- 璧风粓鐐圭紪杈戝尯
-- 閫旂粡鐐圭紪杈戝尯
-- 璺嚎绫诲瀷涓庤矾绾跨瓥鐣?
-- 璺鎬婚噷绋?
-
-杩欎釜缁勪欢鎵挎媴鐨勬槸鈥滃湴鍥剧浉鍏宠鎯呯鐞嗗彴鈥濈殑瑙掕壊銆?
-
-浠庝骇鍝佽搴︾湅锛岃繖涔熸槸浣犺繖涓」鐩尯鍒簬鏅€氬湴鍥炬墦鐐瑰伐鍏风殑鏍稿績涔嬩竴銆?
-
----
-
-### 14. 绛涢€夌粍浠讹細`src/components/FilterPanel.tsx`
-
-杩欎釜缁勪欢璐熻矗涓夌骇绛涢€夛細
-
-- 鏃呯▼
-- 鏃ユ湡
-- 璺
-
-鍚屾椂浼氭樉绀猴細
-
-- 褰撳墠鏃呯▼鎬婚噷绋?
-- 褰撳墠鏃ユ湡鎬婚噷绋?
-- 涓嶅悓绛涢€夊眰绾т笅鐨勬彁绀烘枃妗?
-
-瀹冩湰韬€昏緫涓嶉噸锛屽睘浜庢瘮杈冩爣鍑嗐€佹竻鏅扮殑鈥滃彈鎺х粍浠垛€濄€?
-
----
-
-### 15. 鏂板琛ㄥ崟缁勪欢锛歚src/components/TripEditor.tsx`
-
-杩欎釜缁勪欢鎵挎媴涓や欢浜嬶細
-
-- 鏂板鏃呯▼
-- 涓烘煇涓梾绋嬫煇涓€澶╂柊澧炶矾娈?
-
-瀹冩湁鍑犱釜鍊煎緱娉ㄦ剰鐨勭偣锛?
-
-#### 锛?锛夋棩鏈熼€夐」鍔ㄦ€佺敓鎴?
-
-鏍规嵁鏃呯▼鐨勫紑濮嬫棩鏈熷拰缁撴潫鏃ユ湡锛岀敤 `eachDayInRange()` 鑷姩鐢熸垚鍙€夋棩鏈燂紝鑰屼笉鏄鐢ㄦ埛闅忎究濉€?
-
-杩欒兘鍑忓皯閿欒鏃ユ湡杈撳叆銆?
-
-#### 锛?锛夎捣缁堢偣 / 閫旂粡鐐圭粺涓€鎺ュ叆鑱旀兂缁勪欢
-
-璇存槑浣犵殑杈撳叆浣撻獙宸茬粡寮€濮嬭鑼冨寲锛岃€屼笉鏄瘡涓湴鏂瑰悇鍐欎竴濂椼€?
-
-#### 锛?锛夎矾绾跨被鍨嬩笌璺嚎绛栫暐鍒嗙
-
-- `routeType` 璐熻矗鍐冲畾椹捐溅 / 楠戣
-- `preference` 璐熻矗椹捐溅绛栫暐
-
-杩欎釜寤烘ā鏄悎鐞嗙殑銆?
-
----
-
-### 16. 鑱旀兂杈撳叆缁勪欢锛歚src/components/PlaceAutocomplete.tsx`
-
-杩欎釜缁勪欢鏄敤鎴蜂綋楠屽眰闈㈠仛寰楁瘮杈冪粏鐨勪竴閮ㄥ垎銆?
-
-瀹冨疄鐜颁簡锛?
-
-- 杈撳叆闃叉姈
-- AbortController 鍙栨秷鏃ц姹?
-- 璇锋眰涔卞簭淇濇姢
-- 涓枃杈撳叆娉曠粍鍚堣緭鍏ュ鐞?
-- 鍊欓€夊睍绀?
-- 鍩庡競閿氱偣鑼冨洿閿佸畾
-- 鑼冨洿閿佸畾鍚庣殑鈥滄竻闄よ寖鍥粹€?
-- 閿欒閲嶈瘯
-
-杩欒鏄庝綘宸茬粡澶勭悊杩囧疄闄呰緭鍏ヨ繃绋嬩腑鐨勫緢澶氳竟鐣岄棶棰樸€?
-
-灏ゅ叾鏄細
-
-- 鎷奸煶杈撳叆杩囩▼
-- 杈撳叆妗?focus / blur 鏃舵満
-- 鏃ц姹傝鐩栨柊缁撴灉
-
-杩欎簺鍦版柟濡傛灉娌¤俯杩囧潙锛岄€氬父涓嶄細鍐欏緱杩欎箞缁嗐€?
-
----
-
-### 17. 鏃呯▼绠＄悊寮圭獥锛歚src/components/TripManageModal.tsx`
-
-杩欎釜缁勪欢璐熻矗闆嗕腑绠＄悊鏃呯▼锛?
-
-- 鏌ョ湅鍏ㄩ儴鏃呯▼
-- 缂栬緫鏃呯▼鍚嶇О鍜屾棩鏈?
-- 涓婁笅鎺掑簭
-- 鍒犻櫎鏃呯▼
-
-瀹冨拰 `FilterPanel`銆乣MapPlaceholder` 閰嶅悎鍚庯紝褰㈡垚浜嗭細
-
-- 绛涢€夊叆鍙?
-- 蹇€熸煡鐪嬪叆鍙?
-- 闆嗕腑绠＄悊鍏ュ彛
-
-杩欏浜や簰缁撴瀯宸茬粡鏈夌偣鎺ヨ繎涓€涓湡姝ｅ彲鐢ㄧ殑灏忓伐鍏凤紝鑰屼笉鍐嶅彧鏄?Demo銆?
-
----
-
-### 18. 鍚庣鍏ュ彛锛歚backend/src/app.js` 涓?`backend/src/index.js`
-
-鍚庣鐜板湪鏄竴涓交閲?Express 鏈嶅姟銆?
-
-#### `app.js`
-
-璐熻矗锛?
-
-- 鍒涘缓 Express 搴旂敤
-- 鎸傝浇 CORS
-- 瑙ｆ瀽 JSON
-- 鎻愪緵 `/healthz`
-- 娉ㄥ唽楂樺痉浠ｇ悊鎺ュ彛
-
-#### `index.js`
-
-璐熻矗锛?
-
-- 鍔犺浇鐜鍙橀噺
-- 璇诲彇绔彛
-- 璇诲彇楂樺痉 Key
-- 鍚姩鏈嶅姟
-
-杩欏缁撴瀯铏界劧绠€鍗曪紝浣嗗凡缁忔瘮鈥滄妸鎵€鏈夊悗绔€昏緫閮藉啓杩涗竴涓枃浠垛€濇洿瑙勬暣銆?
-
----
-
-### 19. 鐜鍔犺浇锛歚backend/src/env.js`
-
-杩欎釜鏂囦欢鍋氫簡涓や欢闈炲父瀹炵敤鐨勪簨锛?
-
-#### 锛?锛夊悓鏃跺吋瀹归」鐩牴鐩綍涓庡綋鍓嶅伐浣滅洰褰曠殑 `.env` / `.env.local`
-
-骞朵笖浼氬仛鍘婚噸銆?
-
-杩欏浜庝綘鐢?bat 鍚姩銆佹垨鑰呬粠涓嶅悓鐩綍鎵ц鍛戒护鏃讹紝鍏煎鎬т細鏇村ソ銆?
-
-#### 锛?锛夊吋瀹瑰涓棫鍙橀噺鍚?
-
-瀹冩敮鎸侊細
-
-- `AMAP_WEB_API_KEY`
-- `AMAP_WEB_KEY`
-- `AMAP_KEY`
-
-杩欐湁鍒╀簬鏃т唬鐮佸钩婊戣縼绉汇€?
-
----
-
-### 20. 楂樺痉杈撳叆鎻愮ず浠ｇ悊锛歚backend/src/amapInputTipsProxy.js`
-
-杩欐槸鍚庣閲屽啓寰楁渶瀹屾暣鐨勪竴閮ㄥ垎涔嬩竴銆?
-
-瀹冨疄鐜颁簡锛?
-
-- 鍏抽敭璇嶉暱搴︽牎楠?
-- 鍩庡競鍙傛暟瀹夊叏鏍￠獙
-- location 鍙傛暟瀹夊叏鏍￠獙
-- 绫诲瀷鍙傛暟鏍￠獙
-- 10 鍒嗛挓缂撳瓨
-- 姣忓垎閽熼檺娴?
-- 澶辫触闄嶇骇
-- 琛屾斂鍖鸿繃婊?
-
-
-
----
-
-### 21. 椹捐溅 / 楠戣浠ｇ悊锛歚backend/src/amapDirectionProxy.js` 涓?`backend/src/amapCyclingDirectionProxy.js`
-
-杩欎袱涓枃浠朵富瑕佽礋璐ｏ細
-
-- 妫€鏌ュ繀濉弬鏁?
-- 鎷艰楂樺痉鎺ュ彛 URL
-- 璁剧疆璇锋眰瓒呮椂
-- 杩斿洖缁熶竴 JSON 缁撴瀯
-
-缁撴瀯姣旇緝鐩存帴锛屼紭鐐规槸绠€鍗曘€佹竻妤氥€佹槗鎺掗敊銆?
-
----
-
-### 22. 娴嬭瘯锛歚tests/amapInputTipsProxy.test.js`
-
-褰撳墠娴嬭瘯涓昏瑕嗙洊鐨勬槸杈撳叆鎻愮ず浠ｇ悊锛屽寘鎷細
-
-- 鍏抽敭璇嶈繃鐭笉璁块棶涓婃父
-- 鐩稿悓鏌ヨ鍛戒腑缂撳瓨
-- 闄愭祦閫昏緫杩斿洖 429
-- 绌哄叧閿瘝鎶ラ敊
-- `mode=city` 鏃剁殑琛屾斂鍖鸿繃婊ら€昏緫
-
-铏界劧娴嬭瘯鑼冨洿杩樹笉澶э紝浣嗚嚦灏戣鏄庝綘宸茬粡寮€濮嬪鍚庣浠ｇ悊灞傚仛鑷姩鍖栨牎楠岋紝鑰屼笉鏄畬鍏ㄦ墜娴嬨€?
-
----
-
-### 23. Vite 閰嶇疆锛歚vite.config.ts`
-
-Vite 閰嶇疆閲屾渶鍏抽敭鐨勬槸锛?
-
-- 寮€鍙戠幆澧冧笅鎶?`/api` 浠ｇ悊鍒扮嫭绔嬪悗绔?
-- preview 棰勮妯″紡鍚屾牱浠ｇ悊 `/api`
-
-杩欐牱鍓嶇浠ｇ爜閲屽缁堝彧闇€瑕佽姹?`/api/...`锛屼笉闇€瑕佸埌澶勫啓姝诲畬鏁村悗绔湴鍧€銆?
-
-杩欑鍋氭硶鑳芥槑鏄惧噺灏戝墠鍚庣鍒囨崲鐜鏃剁殑娣蜂贡銆?
-
----
-
+- React 18
+- TypeScript
+- Vite
+- Leaflet / React Leaflet
+- Express
+- AMap Web Service API
+- localStorage
+- IndexedDB
+- Node.js test runner

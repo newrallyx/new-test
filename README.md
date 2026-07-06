@@ -29,15 +29,7 @@ npm -v
 
 From the project root, double-click:
 
-```text
-棣栨鍒濆鍖?bat
-```
-
-After initialization finishes, double-click:
-
-```text
-鍚姩绋嬪簭.bat
-```
+Use the initialization batch file in the project root. After initialization finishes, run the startup batch file.
 
 The app starts the frontend and backend, then opens:
 
@@ -47,10 +39,12 @@ http://localhost:5173
 
 ### Daily Startup
 
-- `鍚姩绋嬪簭.bat`: start both frontend and backend
-- `鍏抽棴绋嬪簭.bat`: stop local services
-- `鍚姩鍓嶇.bat`: start only the frontend
-- `鍚姩鍚庣.bat`: start only the backend
+The project root contains Windows `.bat` helpers for common tasks:
+
+- Start the full app.
+- Stop local services.
+- Start only the frontend.
+- Start only the backend.
 
 ## Environment Variables
 

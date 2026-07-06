@@ -10,17 +10,25 @@ import { useRouteCacheHydration } from './hooks/useRouteCacheHydration'
 import { useSegmentEditing, type SegmentMetaDraft } from './hooks/useSegmentEditing'
 import { useTripManager, type EndpointDraft } from './hooks/useTripManager'
 import { useTripReviewState } from './hooks/useTripReviewState'
+import { createTripBackupExport } from './services/tripBackup'
 import type { CoordPoint, FilterState, RouteColorMode, RouteSegment, RouteSummary, TripCategory, Waypoint } from './types/trip'
 import { formatDistance, getDayDistanceMeters, getTrackDistanceMeters, getTripDistanceMeters } from './utils/distance'
 import { normalizeSegmentNote, normalizeScore } from './utils/segmentScores'
 import './styles/app.css'
 
 function App() {
-  const { tripReview, setTripReview, isLoading, loadError } = useTripReviewState()
+  const {
+    tripReview,
+    setTripReview,
+    demoLoading: isLoading,
+    demoError: loadError,
+  } = useTripReviewState()
   const [activeWorkspace, setActiveWorkspace] = useState<TripCategory>('review')
   const [filters, setFilters] = useState<FilterState>({ tripId: '', dayId: '', segmentId: '' })
   const [tripManagerOpen, setTripManagerOpen] = useState(false)
   const [routeColorMode, setRouteColorMode] = useState<RouteColorMode>('default')
+  const [isExportingBackup, setIsExportingBackup] = useState(false)
+  const [backupMessage, setBackupMessage] = useState('')
 
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null)
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null)
@@ -259,6 +267,33 @@ function App() {
     selectedTrip,
   ])
 
+  const exportBackup = useCallback(async () => {
+    setIsExportingBackup(true)
+    setBackupMessage('')
+
+    try {
+      const backup = await createTripBackupExport(tripReview)
+      const blob = new Blob([backup.json], { type: 'application/json;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = backup.filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+
+      setBackupMessage(
+        `已导出 ${backup.tripCount} 个旅程、${backup.routeSegmentCount} 条路段、${backup.routeCacheCount} 条路线缓存。`,
+      )
+    } catch (error) {
+      console.error('[backup] Failed to export trip backup.', error)
+      setBackupMessage('导出失败，请打开浏览器控制台查看错误。')
+    } finally {
+      setIsExportingBackup(false)
+    }
+  }, [tripReview])
+
   const saveResolvedRoutes = useCallback(
     (patches: Array<{ segmentId: string; points: CoordPoint[]; distanceMeters: number | null; routeBuildKey: string }>) => {
       if (isReadonlyDemoMode) return
@@ -347,25 +382,31 @@ function App() {
     <main className="app-shell">
       <header className="top-nav">
         <div className="top-nav-title-group">
-          <h1>自驾旅行记录与规划工具</h1>
+            <h1>自驾旅行记录与规划工具</h1>
           <p>{filterContext.tripName} · {filterContext.dayDate} · {filterContext.segmentName}</p>
           {isReadonlyDemoMode && <p className="readonly-banner">演示版 / 只读模式：当前内容不可修改</p>}
+          {backupMessage && <p className="backup-export-status">{backupMessage}</p>}
         </div>
-        <div className="workspace-tabs" role="tablist" aria-label="总分类">
-          <button
-            type="button"
-            className={activeWorkspace === 'review' ? 'active' : ''}
-            onClick={() => setActiveWorkspace('review')}
-          >
-            复盘
+        <div className="top-nav-actions">
+          <button type="button" className="backup-export-button" onClick={exportBackup} disabled={isExportingBackup}>
+            {isExportingBackup ? '导出中...' : '导出备份'}
           </button>
-          <button
-            type="button"
-            className={activeWorkspace === 'plan' ? 'active' : ''}
-            onClick={() => setActiveWorkspace('plan')}
-          >
-            规划
-          </button>
+          <div className="workspace-tabs" role="tablist" aria-label="总分类">
+            <button
+              type="button"
+              className={activeWorkspace === 'review' ? 'active' : ''}
+              onClick={() => setActiveWorkspace('review')}
+            >
+              复盘
+            </button>
+            <button
+              type="button"
+              className={activeWorkspace === 'plan' ? 'active' : ''}
+              onClick={() => setActiveWorkspace('plan')}
+            >
+              规划
+            </button>
+          </div>
         </div>
       </header>
 

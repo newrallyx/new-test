@@ -452,6 +452,7 @@ function MapPanel({
   const mapResizeKey = `${renderedTracks.length}-${editingSegmentId ?? ''}-${loading ? 'loading' : 'idle'}`
   const segmentMap = useMemo(() => new Map(filteredSegments.map((segment) => [segment.id, segment])), [filteredSegments])
   const activeLegendMode = routeColorMode === 'default' ? null : routeColorMode
+  const showPointMarkers = !isOverviewMode
 
   const handleCancel = () => {
     if (originalLine) setDraftLine(originalLine.map((point) => ({ ...point })))
@@ -541,7 +542,7 @@ function MapPanel({
               : null,
           )}
 
-          {renderedTracks.flatMap((track) =>
+          {showPointMarkers && renderedTracks.flatMap((track) =>
             track.points.map((point, index) => {
               const draggable =
                 editingSegmentId === track.segmentId &&
@@ -621,7 +622,7 @@ function MapPanel({
               )
             })}
 
-          {selectedWaypoint && typeof selectedWaypoint.lat === 'number' && typeof selectedWaypoint.lng === 'number' ? (
+          {showPointMarkers && selectedWaypoint && typeof selectedWaypoint.lat === 'number' && typeof selectedWaypoint.lng === 'number' ? (
             <Marker position={[selectedWaypoint.lat, selectedWaypoint.lng]} icon={selectedWaypointIcon}>
               <Popup>{selectedWaypoint.name || '已定位途经点'}</Popup>
             </Marker>

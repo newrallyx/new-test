@@ -44,6 +44,29 @@
   border: 1px solid #fcd34d;
 }
 
+.top-nav-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.backup-export-button {
+  white-space: nowrap;
+  border-color: #0f766e;
+  color: #0f766e;
+  background: #f0fdfa;
+  font-weight: 600;
+}
+
+.backup-export-button:hover:not(:disabled) {
+  background: #ccfbf1;
+}
+
+.backup-export-status {
+  color: #0f766e !important;
+}
 .workspace-tabs {
   display: inline-flex;
   gap: 6px;

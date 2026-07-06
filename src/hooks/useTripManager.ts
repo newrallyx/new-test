@@ -23,6 +23,11 @@ interface SegmentRef {
   segment: RouteSegment
 }
 
+interface SegmentSelection {
+  dayId: string
+  segmentId: string
+}
+
 interface UseTripManagerParams {
   isReadonlyMode: boolean
   activeWorkspace: TripCategory
@@ -54,6 +59,18 @@ export interface EndpointDraft {
 
 function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+}
+
+function getPreviousSegmentSelection(ref: SegmentRef): SegmentSelection | null {
+  const flatSegments = ref.trip.days.flatMap((day) =>
+    day.routeSegments.map((segment) => ({
+      dayId: day.id,
+      segmentId: segment.id,
+    })),
+  )
+  const currentIndex = flatSegments.findIndex((item) => item.segmentId === ref.segment.id)
+  if (currentIndex <= 0) return null
+  return flatSegments[currentIndex - 1]
 }
 
 export function useTripManager({
@@ -123,6 +140,11 @@ export function useTripManager({
 
   const updateSegmentMeta = useCallback((segmentId: string, patch: { name: string; date: string }) => {
     if (blockReadonlyWrite('updateSegmentMeta')) return
+    const currentRef = findSegmentRef(segmentId)
+    const fallbackSelection = currentRef && patch.date && patch.date !== currentRef.day.date
+      ? getPreviousSegmentSelection(currentRef)
+      : null
+
     setTripReview((prev) => {
       const ref = findSegmentRef(segmentId, prev)
       if (!ref) return prev
@@ -178,6 +200,9 @@ export function useTripManager({
 
     setFilters((prev) => {
       if (prev.segmentId !== segmentId && activeSegmentId !== segmentId) return prev
+      if (fallbackSelection) {
+        return { ...prev, dayId: fallbackSelection.dayId, segmentId: fallbackSelection.segmentId }
+      }
       return { ...prev, dayId: patch.date || prev.dayId }
     })
   }, [activeSegmentId, blockReadonlyWrite, findSegmentRef, setFilters, setTripReview])

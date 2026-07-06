@@ -38,6 +38,18 @@ function TripManageModal({
 
   const sortedTrips = useMemo(() => trips, [trips])
 
+  const moveTripToEdge = (tripId: string, edge: 'top' | 'bottom') => {
+    if (isReadonlyMode) return
+    const orderedIds = sortedTrips.map((trip) => trip.id)
+    const from = orderedIds.findIndex((id) => id === tripId)
+    if (from < 0) return
+    const to = edge === 'top' ? 0 : orderedIds.length - 1
+    if (from === to) return
+    const [moved] = orderedIds.splice(from, 1)
+    orderedIds.splice(to, 0, moved)
+    onReorderTrips(orderedIds)
+  }
+
   return (
     <section className="card-section sidebar-manage-panel" role="region" aria-label="管理旅程面板">
       <div className="sidebar-manage-header">
@@ -179,6 +191,16 @@ function TripManageModal({
                       disabled={isReadonlyMode || index === sortedTrips.length - 1}
                     >
                       下移
+                    </button>
+                    <button type="button" onClick={() => moveTripToEdge(trip.id, 'top')} disabled={isReadonlyMode || index === 0}>
+                      移到顶部
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveTripToEdge(trip.id, 'bottom')}
+                      disabled={isReadonlyMode || index === sortedTrips.length - 1}
+                    >
+                      移到底部
                     </button>
                     <button type="button" className="danger-btn" onClick={() => onDeleteTrip(trip.id)} disabled={isReadonlyMode}>
                       删除

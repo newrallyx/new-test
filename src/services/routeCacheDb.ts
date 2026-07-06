@@ -4,7 +4,7 @@ const DB_NAME = 'trip-route-cache'
 const DB_VERSION = 1
 const STORE_NAME = 'segmentRoutes'
 
-interface RouteCacheRecord {
+export interface RouteCacheRecord {
   segmentId: string
   routeBuildKey: string
   points: CoordPoint[]
@@ -123,6 +123,45 @@ export async function getSegmentRouteCache(segmentId: string): Promise<RouteCach
   } catch (error) {
     console.error('[routeCacheDb] Failed to read segment route cache.', error)
     return null
+  }
+}
+
+export async function getAllSegmentRouteCache(): Promise<RouteCacheRecord[]> {
+  try {
+    const db = await openRouteCacheDb()
+    const records = await new Promise<RouteCacheRecord[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+      const request = store.getAll()
+
+      request.onsuccess = () => {
+        const results = Array.isArray(request.result) ? request.result : []
+        const normalized = results
+          .map((item) => {
+            const result = item as Partial<RouteCacheRecord>
+            const points = normalizeCoordPointArray(result.points)
+            if (!points || typeof result.routeBuildKey !== 'string' || typeof result.segmentId !== 'string') {
+              return null
+            }
+
+            return {
+              segmentId: result.segmentId,
+              routeBuildKey: result.routeBuildKey,
+              points,
+              updatedAt: typeof result.updatedAt === 'number' ? result.updatedAt : 0,
+            }
+          })
+          .filter((item): item is RouteCacheRecord => Boolean(item))
+
+        resolve(normalized)
+      }
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+    return records
+  } catch (error) {
+    console.error('[routeCacheDb] Failed to read all segment route cache.', error)
+    return []
   }
 }
 

@@ -1,4 +1,5 @@
 @echo off
+chcp 936 >nul
 title 旅行轨迹记录软件 - 后端服务
 
 cd /d "%~dp0"

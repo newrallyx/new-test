@@ -1,7 +1,7 @@
-﻿import express from 'express'
-import cors from 'cors'
 import fs from 'node:fs'
 import path from 'node:path'
+import express from 'express'
+import cors from 'cors'
 import { createInputTipsProxyHandler } from './amapInputTipsProxy.js'
 import { createDirectionProxyHandler } from './amapDirectionProxy.js'
 import { createCyclingDirectionProxyHandler } from './amapCyclingDirectionProxy.js'
@@ -37,7 +37,10 @@ function writeStoredAmapKey(filePath, amapWebApiKey) {
 
 export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApiKeySetup = true } = {}) {
   const app = express()
-  let currentAmapWebApiKey = cleanAmapKey(amapWebApiKey) || readStoredAmapKey(apiKeyConfigPath)
+  const environmentAmapKey = cleanAmapKey(amapWebApiKey)
+  const storedAmapKey = readStoredAmapKey(apiKeyConfigPath)
+  let currentAmapWebApiKey = environmentAmapKey || storedAmapKey
+  let currentAmapKeySource = environmentAmapKey ? 'environment' : storedAmapKey ? 'local-config' : null
 
   const getAmapWebApiKey = () => currentAmapWebApiKey
 
@@ -52,7 +55,7 @@ export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApi
     res.status(200).json({
       ok: true,
       configured: Boolean(currentAmapWebApiKey),
-      source: currentAmapWebApiKey ? (cleanAmapKey(amapWebApiKey) ? 'environment' : 'local-config') : null,
+      source: currentAmapKeySource,
     })
   })
 
@@ -71,7 +74,8 @@ export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApi
     try {
       writeStoredAmapKey(apiKeyConfigPath, nextKey)
       currentAmapWebApiKey = nextKey
-      res.status(200).json({ ok: true, configured: true })
+      currentAmapKeySource = 'local-config'
+      res.status(200).json({ ok: true, configured: true, source: currentAmapKeySource })
     } catch (error) {
       console.error('[backend] Failed to save AMAP key config.', error)
       res.status(500).json({ ok: false, message: 'Failed to save API key.' })
@@ -88,7 +92,6 @@ export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApi
 
   if (staticDir && fs.existsSync(staticDir)) {
     app.use(express.static(staticDir))
-
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api/')) {
         next()

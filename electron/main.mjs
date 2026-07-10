@@ -1,4 +1,4 @@
-﻿import { createServer } from 'node:http'
+import { createServer } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, shell } from 'electron'
@@ -8,9 +8,15 @@ import { loadBackendEnv, resolveAmapWebApiKey } from '../backend/src/env.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const projectRoot = path.resolve(__dirname, '..')
+const DEFAULT_DESKTOP_PORT = 41873
 
 let mainWindow = null
 let server = null
+
+function getDesktopPort() {
+  const rawPort = Number.parseInt(process.env.ROADTRIP_DESKTOP_PORT ?? '', 10)
+  return Number.isInteger(rawPort) && rawPort > 0 && rawPort < 65536 ? rawPort : DEFAULT_DESKTOP_PORT
+}
 
 function getExternalEnvPaths() {
   const paths = []
@@ -36,7 +42,10 @@ function getApiKeyConfigPath() {
 }
 
 function startLocalServer() {
-  loadBackendEnv(getExternalEnvPaths())
+  loadBackendEnv({
+    extraPaths: getExternalEnvPaths(),
+    includeDefaultPaths: !app.isPackaged,
+  })
 
   const { key: amapWebApiKey, source } = resolveAmapWebApiKey(process.env)
   if (!amapWebApiKey) {
@@ -50,18 +59,20 @@ function startLocalServer() {
     staticDir: getStaticDir(),
     apiKeyConfigPath: getApiKeyConfigPath(),
   })
+  const desktopPort = getDesktopPort()
 
   return new Promise((resolve, reject) => {
     server = createServer(expressApp)
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address()
-      if (!address || typeof address === 'string') {
-        reject(new Error('Failed to resolve desktop server port.'))
+    server.once('error', (error) => {
+      if (error && error.code === 'EADDRINUSE') {
+        reject(new Error(`桌面服务端口 ${desktopPort} 已被占用，请关闭正在运行的程序后重试。`))
         return
       }
 
-      resolve(`http://127.0.0.1:${address.port}`)
+      reject(error)
+    })
+    server.listen(desktopPort, '127.0.0.1', () => {
+      resolve(`http://127.0.0.1:${desktopPort}`)
     })
   })
 }
@@ -75,7 +86,7 @@ async function createMainWindow() {
     minWidth: 1100,
     minHeight: 720,
     show: false,
-    title: '旅行轨迹记录与规划工具',
+    title: '自驾旅行记录与规划工具',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -94,19 +105,30 @@ async function createMainWindow() {
   await mainWindow.loadURL(appUrl)
 }
 
-app.whenReady().then(() => {
-  createMainWindow().catch((error) => {
-    console.error(error)
-    dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error))
-    app.quit()
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
   })
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      void createMainWindow()
-    }
+  app.whenReady().then(() => {
+    createMainWindow().catch((error) => {
+      console.error(error)
+      dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error))
+      app.quit()
+    })
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        void createMainWindow()
+      }
+    })
   })
-})
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

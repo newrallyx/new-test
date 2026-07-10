@@ -24,17 +24,23 @@ function uniquePaths(paths) {
   return result
 }
 
-export function loadBackendEnv(extraPaths = []) {
+export function loadBackendEnv(options = {}) {
+  const normalizedOptions = Array.isArray(options) ? { extraPaths: options } : options
+  const extraPaths = normalizedOptions.extraPaths ?? []
+  const includeDefaultPaths = normalizedOptions.includeDefaultPaths ?? true
   const projectRoot = path.resolve(__dirname, '..', '..')
   const cwd = process.cwd()
 
-  const candidates = uniquePaths([
-    ...extraPaths,
-    path.join(projectRoot, '.env'),
-    path.join(projectRoot, '.env.local'),
-    path.join(cwd, '.env'),
-    path.join(cwd, '.env.local'),
-  ])
+  const defaultPaths = includeDefaultPaths
+    ? [
+        path.join(projectRoot, '.env'),
+        path.join(projectRoot, '.env.local'),
+        path.join(cwd, '.env'),
+        path.join(cwd, '.env.local'),
+      ]
+    : []
+
+  const candidates = uniquePaths([...extraPaths, ...defaultPaths])
 
   for (const filePath of candidates) {
     if (!fs.existsSync(filePath)) continue

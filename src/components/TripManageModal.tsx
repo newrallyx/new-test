@@ -7,6 +7,7 @@ interface TripManageModalProps {
   isReadonlyMode: boolean
   onClose: () => void
   onDeleteTrip: (tripId: string) => void
+  onDuplicateTrip: (tripId: string) => void
   onMoveTrip: (tripId: string, direction: 'up' | 'down') => void
   onReorderTrips: (orderedTripIds: string[]) => void
   onUpdateTrip: (tripId: string, patch: { title: string; startDate: string; endDate: string }) => boolean
@@ -27,6 +28,7 @@ function TripManageModal({
   isReadonlyMode,
   onClose,
   onDeleteTrip,
+  onDuplicateTrip,
   onMoveTrip,
   onReorderTrips,
   onUpdateTrip,
@@ -181,6 +183,17 @@ function TripManageModal({
                       }}
                     >
                       编辑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isReadonlyMode) return
+                        onDuplicateTrip(trip.id)
+                        setErrorText('')
+                      }}
+                      disabled={isReadonlyMode}
+                    >
+                      新建副本
                     </button>
                     <button type="button" onClick={() => onMoveTrip(trip.id, 'up')} disabled={isReadonlyMode || index === 0}>
                       上移

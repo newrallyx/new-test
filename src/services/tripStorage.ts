@@ -1,5 +1,6 @@
 import { mockTripReview } from './mockData'
 import type { CoordPoint, RouteSegment, TripReview, Waypoint } from '../types/trip'
+import { sortTripDaysByDate } from '../utils/date'
 import { normalizeScore, normalizeSegmentNote } from '../utils/segmentScores'
 
 // 本地存储服务：统一处理 TripReview 的读取与保存，避免组件直接操作 localStorage。
@@ -95,10 +96,12 @@ function normalizeTripReview(input: TripReview): TripReview {
     trips: (input.trips ?? []).map((trip) => ({
       ...trip,
       category: trip.category === 'plan' ? 'plan' : 'review',
-      days: (trip.days ?? []).map((day) => ({
-        ...day,
-        routeSegments: (day.routeSegments ?? []).map((segment) => normalizeRouteSegment(segment)),
-      })),
+      days: sortTripDaysByDate(
+        (trip.days ?? []).map((day) => ({
+          ...day,
+          routeSegments: (day.routeSegments ?? []).map((segment) => normalizeRouteSegment(segment)),
+        })),
+      ),
     })),
   }
 }
@@ -130,10 +133,12 @@ export function toPersistedTripReview(data: TripReview): TripReview {
   return {
     trips: data.trips.map((trip) => ({
       ...trip,
-      days: trip.days.map((day) => ({
-        ...day,
-        routeSegments: day.routeSegments.map((segment) => toPersistedRouteSegment(segment)),
-      })),
+      days: sortTripDaysByDate(
+        trip.days.map((day) => ({
+          ...day,
+          routeSegments: day.routeSegments.map((segment) => toPersistedRouteSegment(segment)),
+        })),
+      ),
     })),
   }
 }

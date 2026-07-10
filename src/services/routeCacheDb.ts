@@ -198,3 +198,39 @@ export async function clearAllRouteCache(): Promise<void> {
     console.error('[routeCacheDb] Failed to clear route cache.', error)
   }
 }
+
+export async function replaceAllSegmentRouteCache(records: RouteCacheRecord[]): Promise<number> {
+  try {
+    const normalizedRecords = records
+      .map((record) => {
+        const points = normalizeCoordPointArray(record.points)
+        if (!points || typeof record.segmentId !== 'string' || typeof record.routeBuildKey !== 'string') {
+          return null
+        }
+
+        return {
+          segmentId: record.segmentId,
+          routeBuildKey: record.routeBuildKey,
+          points,
+          updatedAt: typeof record.updatedAt === 'number' ? record.updatedAt : Date.now(),
+        } satisfies RouteCacheRecord
+      })
+      .filter((record): record is RouteCacheRecord => Boolean(record))
+
+    const db = await openRouteCacheDb()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite')
+      const store = tx.objectStore(STORE_NAME)
+      store.clear()
+      normalizedRecords.forEach((record) => store.put(record))
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error)
+    })
+    db.close()
+    return normalizedRecords.length
+  } catch (error) {
+    console.error('[routeCacheDb] Failed to replace segment route cache.', error)
+    throw error
+  }
+}

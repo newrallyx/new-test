@@ -1,4 +1,5 @@
 @echo off
+chcp 936 >nul
 title 旅行轨迹记录软件 - 启动程序
 
 cd /d "%~dp0"

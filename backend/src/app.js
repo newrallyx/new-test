@@ -90,9 +90,14 @@ export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApi
   app.get('/api/amap/direction', directionHandler)
   app.get('/api/amap/cycling-direction', cyclingDirectionHandler)
 
-  if (staticDir) {
+  if (staticDir && fs.existsSync(staticDir)) {
     app.use(express.static(staticDir))
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        next()
+        return
+      }
+
       res.sendFile(path.join(staticDir, 'index.html'))
     })
   }

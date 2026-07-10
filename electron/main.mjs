@@ -21,7 +21,7 @@ function getDesktopPort() {
 function getExternalEnvPaths() {
   const paths = []
 
-  if (!app.isPackaged) {
+  if (app.isPackaged) {
     paths.push(
       path.join(path.dirname(process.execPath), '.env'),
       path.join(path.dirname(process.execPath), '.env.local'),

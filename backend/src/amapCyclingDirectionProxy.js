@@ -41,6 +41,7 @@ export function createCyclingDirectionProxyHandler({ amapWebApiKey, getAmapWebAp
     targetUrl.searchParams.set('key', currentAmapWebApiKey)
     targetUrl.searchParams.set('origin', origin)
     targetUrl.searchParams.set('destination', destination)
+    targetUrl.searchParams.set('output', 'json')
 
     try {
       const upstream = await fetchWithTimeout(targetUrl.toString(), 5000)

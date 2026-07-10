@@ -44,6 +44,8 @@ export function createDirectionProxyHandler({ amapWebApiKey, getAmapWebApiKey } 
     targetUrl.searchParams.set('origin', origin)
     targetUrl.searchParams.set('destination', destination)
     targetUrl.searchParams.set('strategy', strategy)
+    targetUrl.searchParams.set('extensions', 'all')
+    targetUrl.searchParams.set('output', 'json')
     if (waypoints) {
       targetUrl.searchParams.set('waypoints', waypoints.replace(/\|/g, ';'))
     }

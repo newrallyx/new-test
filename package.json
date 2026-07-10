@@ -13,7 +13,8 @@
     "test": "node --test tests/*.test.js",
     "dev:frontend": "vite",
     "dev:backend": "node backend/src/index.js",
-    "start:backend": "node backend/src/index.js"
+    "start:backend": "node backend/src/index.js",
+    "desktop": "npm run build && electron ."
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -63,5 +64,7 @@
     "portable": {
       "artifactName": "${productName} ${version}.${ext}"
     }
-  }
+  },
+  "description": "Desktop app for roadtrip route recording and planning.",
+  "author": "Local User"
 }

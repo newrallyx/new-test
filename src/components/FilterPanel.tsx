@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { FilterState, RouteColorMode, Trip } from '../types/trip'
+import { sortTripDaysByDate } from '../utils/date'
 
 interface FilterPanelProps {
   trips: Trip[]
@@ -9,6 +10,9 @@ interface FilterPanelProps {
   onChangeRouteColorMode: (mode: RouteColorMode) => void
   canUseScoreColoring: boolean
   onOpenTripManager: () => void
+  onDuplicateTrip: (tripId: string) => void
+  onInsertDayAfter: (tripId: string, dayId: string) => void
+  onDeleteDay: (tripId: string, dayId: string) => void
   isReadonlyMode: boolean
   dayDistanceText: string
   tripDistanceText: string
@@ -23,6 +27,9 @@ function FilterPanel({
   onChangeRouteColorMode,
   canUseScoreColoring,
   onOpenTripManager,
+  onDuplicateTrip,
+  onInsertDayAfter,
+  onDeleteDay,
   isReadonlyMode,
   dayDistanceText,
   tripDistanceText,
@@ -30,7 +37,7 @@ function FilterPanel({
   const selectedTrip = trips.find((trip) => trip.id === filters.tripId)
 
   const dayOptions = useMemo(() => {
-    return selectedTrip?.days ?? []
+    return sortTripDaysByDate(selectedTrip?.days ?? [])
   }, [selectedTrip])
 
   const segmentOptions = useMemo(() => {
@@ -43,7 +50,7 @@ function FilterPanel({
       <h2 className="filter-panel-title">2) 筛选区</h2>
 
       <div className="filter-row">
-        <label>
+        <label className="trip-filter-field">
           旅程
           <div className="trip-filter-row">
             <select
@@ -57,29 +64,61 @@ function FilterPanel({
                 </option>
               ))}
             </select>
-            <button type="button" onClick={onOpenTripManager}>
-              {isReadonlyMode ? '查看旅程' : '管理旅程'}
-            </button>
+            <div className="trip-filter-actions">
+              <button type="button" onClick={onOpenTripManager}>
+                {isReadonlyMode ? '查看旅程' : '管理旅程'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (filters.tripId) onDuplicateTrip(filters.tripId)
+                }}
+                disabled={isReadonlyMode || !filters.tripId}
+              >
+                新建副本
+              </button>
+            </div>
           </div>
         </label>
 
-        <label>
+        <label className="date-filter-field">
           日期
-          <select
-            value={filters.dayId}
-            onChange={(e) => onChange({ ...filters, dayId: e.target.value, segmentId: '' })}
-            disabled={!filters.tripId}
-          >
-            <option value="">全部日期</option>
-            {dayOptions.map((day) => (
-              <option key={day.id} value={day.id}>
-                {day.date}
-              </option>
-            ))}
-          </select>
+          <div className="date-filter-row">
+            <select
+              value={filters.dayId}
+              onChange={(e) => onChange({ ...filters, dayId: e.target.value, segmentId: '' })}
+              disabled={!filters.tripId}
+            >
+              <option value="">全部日期</option>
+              {dayOptions.map((day) => (
+                <option key={day.id} value={day.id}>
+                  {day.date}
+                </option>
+              ))}
+            </select>
+            <div className="date-filter-actions">
+              <button
+                type="button"
+                onClick={() => onInsertDayAfter(filters.tripId, filters.dayId)}
+                disabled={isReadonlyMode || !filters.tripId || !filters.dayId}
+                title="在当前日期后插入空白的一天，并将后续日期顺延一天"
+              >
+                插入下一天
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={() => onDeleteDay(filters.tripId, filters.dayId)}
+                disabled={isReadonlyMode || !filters.tripId || !filters.dayId}
+                title="删除当前日期，并将后续日期提前一天"
+              >
+                删除当天
+              </button>
+            </div>
+          </div>
         </label>
 
-        <label>
+        <label className="segment-filter-field">
           路段
           <select
             value={filters.segmentId}

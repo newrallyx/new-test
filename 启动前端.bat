@@ -1,15 +1,16 @@
 @echo off
-title 鏃呰杞ㄨ抗璁板綍杞欢 - 鍓嶇鏈嶅姟
+chcp 936 >nul
+title 旅行轨迹记录软件 - 前端服务
 
 cd /d "%~dp0"
 
 echo ======================================
-echo   鏃呰杞ㄨ抗璁板綍杞欢 - 鍓嶇鏈嶅姟
+echo   旅行轨迹记录软件 - 前端服务
 echo ======================================
 echo.
 
 call npm run dev:frontend
 
 echo.
-echo [鍓嶇宸查��鍑篯
+echo [前端已退出]
 pause

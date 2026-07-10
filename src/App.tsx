@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
 import { appMode, isReadonlyDemoMode } from './config/appMode'
+import AmapKeySetupDialog from './components/AmapKeySetupDialog'
 import FilterPanel from './components/FilterPanel'
 import MapPanel from './components/MapPanel'
 import MapPlaceholder from './components/MapPlaceholder'
 import TripEditor from './components/TripEditor'
 import TripManageModal from './components/TripManageModal'
-import { useFilteredSegments } from './hooks/useFilteredSegments'
+import { useAmapKeyConfig } from './hooks/useAmapKeyConfig'
+import { useAppEditingState } from './hooks/useAppEditingState'
+import { useMapInfo } from './hooks/useMapInfo'
+import { useResolvedRoutes } from './hooks/useResolvedRoutes'
 import { useRouteCacheHydration } from './hooks/useRouteCacheHydration'
-import { useSegmentEditing, type SegmentMetaDraft } from './hooks/useSegmentEditing'
-import { useTripManager, type EndpointDraft } from './hooks/useTripManager'
+import { useSegmentEditing } from './hooks/useSegmentEditing'
+import { useTripBackup } from './hooks/useTripBackup'
+import { useTripManager } from './hooks/useTripManager'
 import { useTripReviewState } from './hooks/useTripReviewState'
-import { createTripBackupExport } from './services/tripBackup'
-import type { CoordPoint, FilterState, RouteColorMode, RouteSegment, RouteSummary, TripCategory, Waypoint } from './types/trip'
-import { formatDistance, getDayDistanceMeters, getTrackDistanceMeters, getTripDistanceMeters } from './utils/distance'
+import { useTripWorkspace } from './hooks/useTripWorkspace'
 import { normalizeSegmentNote, normalizeScore } from './utils/segmentScores'
 import './styles/app.css'
 
@@ -23,69 +25,59 @@ function App() {
     demoLoading: isLoading,
     demoError: loadError,
   } = useTripReviewState()
-  const [activeWorkspace, setActiveWorkspace] = useState<TripCategory>('review')
-  const [filters, setFilters] = useState<FilterState>({ tripId: '', dayId: '', segmentId: '' })
-  const [tripManagerOpen, setTripManagerOpen] = useState(false)
-  const [routeColorMode, setRouteColorMode] = useState<RouteColorMode>('default')
-  const [isExportingBackup, setIsExportingBackup] = useState(false)
-  const [backupMessage, setBackupMessage] = useState('')
+  const amapKeyConfig = useAmapKeyConfig(!isReadonlyDemoMode)
 
-  const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null)
-  const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null)
-  const [editingWaypointSegmentId, setEditingWaypointSegmentId] = useState<string | null>(null)
-  const [waypointDrafts, setWaypointDrafts] = useState<Waypoint[]>([])
-  const [editingEndpointsSegmentId, setEditingEndpointsSegmentId] = useState<string | null>(null)
-  const [endpointDraft, setEndpointDraft] = useState<EndpointDraft | null>(null)
-  const [segmentMetaDraft, setSegmentMetaDraft] = useState<SegmentMetaDraft | null>(null)
+  const editing = useAppEditingState()
+  const {
+    editingSegmentId,
+    setEditingSegmentId,
+    selectedWaypointId,
+    setSelectedWaypointId,
+    editingWaypointSegmentId,
+    setEditingWaypointSegmentId,
+    waypointDrafts,
+    setWaypointDrafts,
+    editingEndpointsSegmentId,
+    setEditingEndpointsSegmentId,
+    endpointDraft,
+    setEndpointDraft,
+    segmentMetaDraft,
+    setSegmentMetaDraft,
+  } = editing
+
+  const workspace = useTripWorkspace({
+    trips: tripReview.trips,
+    editingSegmentId,
+    resetEditingState: editing.resetEditingState,
+  })
+  const {
+    activeWorkspace,
+    setActiveWorkspace,
+    filters,
+    setFilters,
+    tripManagerOpen,
+    setTripManagerOpen,
+    routeColorMode,
+    setRouteColorMode,
+    workspaceTrips,
+    isAllTripsSelected,
+    canUseScoreColoring,
+    placeholderMode,
+    mapRenderSegments,
+    listViewSegments,
+    detailSegments,
+    activeSegmentId,
+    selectedTrip,
+    selectedDay,
+    activeSegment,
+    tripListItems,
+    tripDistanceText,
+    dayDistanceText,
+    filterContext,
+    summary,
+  } = workspace
 
   useRouteCacheHydration({ trips: tripReview.trips, setTripReview, enabled: !isReadonlyDemoMode })
-
-  const workspaceTrips = useMemo(
-    () =>
-      tripReview.trips
-        .filter((trip) => trip.category === activeWorkspace)
-        .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)),
-    [tripReview.trips, activeWorkspace],
-  )
-
-  const isAllTripsSelected = !filters.tripId
-  const canUseScoreColoring = !isAllTripsSelected
-  const placeholderMode: 'trip-list' | 'segment-list' = isAllTripsSelected ? 'trip-list' : 'segment-list'
-  const mapRenderSegments = useFilteredSegments(workspaceTrips, filters)
-  const listViewSegments = placeholderMode === 'segment-list' ? mapRenderSegments : []
-
-  const segmentDayDateMap = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const trip of workspaceTrips) {
-      for (const day of trip.days) {
-        for (const segment of day.routeSegments) {
-          if (!map.has(segment.id) && day.date) {
-            map.set(segment.id, day.date)
-          }
-        }
-      }
-    }
-    return map
-  }, [workspaceTrips])
-
-  const detailSegments = useMemo(
-    () =>
-      listViewSegments.map((segment) => ({
-        ...segment,
-        dayDate: (segment as RouteSegment & { dayDate?: string }).dayDate ?? segmentDayDateMap.get(segment.id),
-      })),
-    [listViewSegments, segmentDayDateMap],
-  )
-
-  const activeSegmentId = useMemo(() => {
-    if (editingSegmentId && listViewSegments.some((segment) => segment.id === editingSegmentId)) {
-      return editingSegmentId
-    }
-    if (filters.segmentId && listViewSegments.some((segment) => segment.id === filters.segmentId)) {
-      return filters.segmentId
-    }
-    return null
-  }, [editingSegmentId, filters.segmentId, listViewSegments])
 
   const tripManager = useTripManager({
     isReadonlyMode: isReadonlyDemoMode,
@@ -129,223 +121,32 @@ function App() {
     createId: tripManager.createId,
   })
 
-  useEffect(() => {
-    setFilters((prev) => {
-      const firstTrip = workspaceTrips[0]
-      if (!firstTrip) return { tripId: '', dayId: '', segmentId: '' }
+  const {
+    isExportingBackup,
+    isImportingBackup,
+    backupMessage,
+    backupImportInputRef,
+    exportBackup,
+    importBackup,
+    triggerBackupImport,
+  } = useTripBackup({
+    tripReview,
+    setTripReview,
+    setFilters,
+    resetEditingState: editing.resetEditingState,
+  })
 
-      if (isReadonlyDemoMode && !prev.tripId) {
-        return { tripId: '', dayId: '', segmentId: '' }
-      }
-
-      const selectedTrip = workspaceTrips.find((trip) => trip.id === prev.tripId) ?? firstTrip
-      const selectedDay = selectedTrip.days.find((day) => day.id === prev.dayId) ?? selectedTrip.days[0]
-      const selectedSegment =
-        selectedDay?.routeSegments.find((segment) => segment.id === prev.segmentId) ?? selectedDay?.routeSegments[0]
-
-      return {
-        tripId: selectedTrip.id,
-        dayId: selectedDay?.id ?? '',
-        segmentId: selectedSegment?.id ?? '',
-      }
-    })
-
-    setEditingSegmentId(null)
-    setSelectedWaypointId(null)
-    setEditingWaypointSegmentId(null)
-    setWaypointDrafts([])
-    setEditingEndpointsSegmentId(null)
-    setEndpointDraft(null)
-    setSegmentMetaDraft(null)
-  }, [activeWorkspace, workspaceTrips, isReadonlyDemoMode])
-
-  useEffect(() => {
-    if (canUseScoreColoring || routeColorMode === 'default') return
-    setRouteColorMode('default')
-  }, [canUseScoreColoring, routeColorMode])
-
-  const selectedTrip = useMemo(
-    () => workspaceTrips.find((trip) => trip.id === filters.tripId) ?? null,
-    [workspaceTrips, filters.tripId],
-  )
-  const selectedDay = useMemo(
-    () => selectedTrip?.days.find((day) => day.id === filters.dayId) ?? null,
-    [selectedTrip, filters.dayId],
-  )
-  const activeSegment = useMemo(
-    () => listViewSegments.find((segment) => segment.id === activeSegmentId) ?? null,
-    [listViewSegments, activeSegmentId],
-  )
-
-  const tripListItems = useMemo(
-    () =>
-      workspaceTrips.map((trip) => ({
-        id: trip.id,
-        title: trip.title,
-        startDate: trip.startDate,
-        endDate: trip.endDate,
-        segmentCount: trip.days.reduce((sum, day) => sum + day.routeSegments.length, 0),
-        tripDistanceText: formatDistance(getTripDistanceMeters(trip)),
-      })),
-    [workspaceTrips],
-  )
-
-  const tripDistanceText = useMemo(
-    () => formatDistance(selectedTrip ? getTripDistanceMeters(selectedTrip) : null),
-    [selectedTrip],
-  )
-  const dayDistanceText = useMemo(
-    () => formatDistance(selectedDay ? getDayDistanceMeters(selectedDay.routeSegments) : null),
-    [selectedDay],
-  )
-
-  const filterContext = useMemo(() => {
-    const currentTrip = workspaceTrips.find((trip) => trip.id === filters.tripId)
-    const currentDay = currentTrip?.days.find((day) => day.id === filters.dayId)
-    const currentSegment = currentDay?.routeSegments.find((segment) => segment.id === filters.segmentId)
-
-    return {
-      tripName: currentTrip?.title ?? '全部旅程',
-      dayDate: currentDay?.date ?? '全部日期',
-      segmentName: currentSegment?.name ?? '全部路段',
-    }
-  }, [workspaceTrips, filters.tripId, filters.dayId, filters.segmentId])
-
-  const summary: RouteSummary = useMemo(
-    () => ({ totalDistanceText: formatDistance(activeSegment ? getTrackDistanceMeters(activeSegment) : null) }),
-    [activeSegment],
-  )
-
-  const mapInfo = useMemo(() => {
-    const dateLabel = selectedDay?.date ?? (isAllTripsSelected ? '全部日期' : filterContext.dayDate)
-    const cacheStatus = filters.tripId && filters.dayId && filters.segmentId && mapRenderSegments.length <= 3 ? '按需规划' : '缓存优先'
-
-    const mapDistanceText = (() => {
-      if (activeSegment) {
-        return formatDistance(getTrackDistanceMeters(activeSegment))
-      }
-
-      if (selectedDay) {
-        return formatDistance(getDayDistanceMeters(selectedDay.routeSegments))
-      }
-
-      if (selectedTrip) {
-        return formatDistance(getTripDistanceMeters(selectedTrip))
-      }
-
-      return formatDistance(getDayDistanceMeters(mapRenderSegments))
-    })()
-
-    if (activeSegment) {
-      return {
-        summary: `${activeSegment.name} · ${segmentEditing.activeSegmentDate || dateLabel} · 路段数 ${mapRenderSegments.length} · 距离 ${mapDistanceText} · 缓存状态 ${cacheStatus}`,
-      }
-    }
-
-    if (isAllTripsSelected) {
-      return {
-        summary: `全部路线 · ${dateLabel} · 路段数 ${mapRenderSegments.length} · 距离 ${mapDistanceText} · 缓存状态 ${cacheStatus}`,
-      }
-    }
-
-    return {
-      summary: `${selectedTrip?.title ?? '当前路线'} · ${dateLabel} · 路段数 ${mapRenderSegments.length} · 距离 ${mapDistanceText} · 缓存状态 ${cacheStatus}`,
-    }
-  }, [
+  const saveResolvedRoutes = useResolvedRoutes(setTripReview)
+  const mapInfo = useMapInfo({
     activeSegment,
-    segmentEditing.activeSegmentDate,
+    activeSegmentDate: segmentEditing.activeSegmentDate,
     isAllTripsSelected,
-    selectedDay?.date,
-    filters.tripId,
-    filters.dayId,
-    filters.segmentId,
-    mapRenderSegments.length,
-    mapRenderSegments,
-    filterContext.dayDate,
     selectedDay,
-    selectedTrip?.title,
     selectedTrip,
-  ])
-
-  const exportBackup = useCallback(async () => {
-    setIsExportingBackup(true)
-    setBackupMessage('')
-
-    try {
-      const backup = await createTripBackupExport(tripReview)
-      const blob = new Blob([backup.json], { type: 'application/json;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = backup.filename
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
-
-      setBackupMessage(
-        `已导出 ${backup.tripCount} 个旅程、${backup.routeSegmentCount} 条路段、${backup.routeCacheCount} 条路线缓存。`,
-      )
-    } catch (error) {
-      console.error('[backup] Failed to export trip backup.', error)
-      setBackupMessage('导出失败，请打开浏览器控制台查看错误。')
-    } finally {
-      setIsExportingBackup(false)
-    }
-  }, [tripReview])
-
-  const saveResolvedRoutes = useCallback(
-    (patches: Array<{ segmentId: string; points: CoordPoint[]; distanceMeters: number | null; routeBuildKey: string }>) => {
-      if (isReadonlyDemoMode) return
-      if (!patches.length) return
-      const patchMap = new Map(patches.map((item) => [item.segmentId, item]))
-
-      setTripReview((prev) => {
-        let changed = false
-        const nextTrips = prev.trips.map((trip) => {
-          let hasTripChanges = false
-          const nextDays = trip.days.map((day) => {
-            let dayChanged = false
-            const nextSegments = day.routeSegments.map((segment) => {
-              const patch = patchMap.get(segment.id)
-              if (!patch) return segment
-
-              const sameDistance =
-                (typeof segment.distanceMeters === 'number' ? segment.distanceMeters : null) ===
-                (typeof patch.distanceMeters === 'number' ? Math.round(patch.distanceMeters) : null)
-              const sameRouteKey = segment.routeBuildKey === patch.routeBuildKey
-              const samePoints =
-                Array.isArray(segment.points) &&
-                segment.points.length === patch.points.length &&
-                segment.points.every(
-                  (point, idx) => point.lat === patch.points[idx].lat && point.lon === patch.points[idx].lon,
-                )
-
-              if (sameDistance && sameRouteKey && samePoints) return segment
-
-              changed = true
-              dayChanged = true
-              hasTripChanges = true
-              return {
-                ...segment,
-                points: patch.points,
-                distanceMeters:
-                  typeof patch.distanceMeters === 'number' ? Math.round(patch.distanceMeters) : segment.distanceMeters,
-                routeBuildKey: patch.routeBuildKey,
-              }
-            })
-
-            return dayChanged ? { ...day, routeSegments: nextSegments } : day
-          })
-
-          return hasTripChanges ? { ...trip, days: nextDays } : trip
-        })
-
-        return changed ? { ...prev, trips: nextTrips } : prev
-      })
-    },
-    [isReadonlyDemoMode, setTripReview],
-  )
+    filters,
+    mapRenderSegments,
+    fallbackDayDate: filterContext.dayDate,
+  })
 
   const routePreferenceValue = activeSegment?.preference ?? 'HIGHWAY_FIRST'
   const routeModeValue = activeSegment?.routeType ?? 'DRIVING'
@@ -385,12 +186,51 @@ function App() {
             <h1>自驾旅行记录与规划工具</h1>
           <p>{filterContext.tripName} · {filterContext.dayDate} · {filterContext.segmentName}</p>
           {isReadonlyDemoMode && <p className="readonly-banner">演示版 / 只读模式：当前内容不可修改</p>}
+          {!isReadonlyDemoMode && !amapKeyConfig.isChecking && !amapKeyConfig.configured && (
+            <p className="amap-key-warning">
+              {amapKeyConfig.error || '地图服务尚未配置，地点联想和路线规划暂不可用。'}
+            </p>
+          )}
           {backupMessage && <p className="backup-export-status">{backupMessage}</p>}
         </div>
         <div className="top-nav-actions">
+          <input
+            ref={backupImportInputRef}
+            type="file"
+            className="backup-import-input"
+            accept="application/json,.json"
+            disabled={isReadonlyDemoMode || isImportingBackup}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              if (file) void importBackup(file)
+            }}
+          />
+          <button
+            type="button"
+            className="backup-import-button"
+            onClick={triggerBackupImport}
+            disabled={isReadonlyDemoMode || isImportingBackup}
+          >
+            {isImportingBackup ? '导入中...' : '导入备份'}
+          </button>
           <button type="button" className="backup-export-button" onClick={exportBackup} disabled={isExportingBackup}>
             {isExportingBackup ? '导出中...' : '导出备份'}
           </button>
+          {!isReadonlyDemoMode && (
+            <button
+              type="button"
+              className={amapKeyConfig.configured ? 'amap-key-button configured' : 'amap-key-button'}
+              onClick={amapKeyConfig.open}
+              disabled={amapKeyConfig.isChecking}
+            >
+              {amapKeyConfig.isChecking
+                ? '检查地图服务...'
+                : amapKeyConfig.configured
+                  ? '地图服务设置'
+                  : '配置地图服务'}
+            </button>
+          )}
           <div className="workspace-tabs" role="tablist" aria-label="总分类">
             <button
               type="button"
@@ -424,6 +264,7 @@ function App() {
               trips={workspaceTrips}
               onClose={() => setTripManagerOpen(false)}
               onDeleteTrip={tripManager.deleteTrip}
+              onDuplicateTrip={tripManager.duplicateTrip}
               onMoveTrip={tripManager.moveTrip}
               onReorderTrips={tripManager.reorderTrips}
               onUpdateTrip={tripManager.updateTrip}
@@ -450,18 +291,10 @@ function App() {
               }}
               selectedWaypoint={segmentEditing.selectedWaypoint}
               onRouteResolved={saveResolvedRoutes}
+              routeServiceRevision={amapKeyConfig.serviceRevision}
               allowAutoBuild={Boolean(!isReadonlyDemoMode && filters.tripId && filters.dayId && filters.segmentId && mapRenderSegments.length <= 3)}
               isReadonlyMode={isReadonlyDemoMode}
-              onEndpointDraftChange={(payload) => {
-                setEndpointDraft((prev) => {
-                  if (!prev || prev.segmentId !== payload.segmentId) return prev
-                  return {
-                    ...prev,
-                    startCoord: payload.startCoord,
-                    endCoord: payload.endCoord,
-                  }
-                })
-              }}
+              onEndpointDraftChange={editing.updateEndpointCoords}
             />
           </div>
 
@@ -473,6 +306,9 @@ function App() {
             onChangeRouteColorMode={setRouteColorMode}
             canUseScoreColoring={canUseScoreColoring}
             onOpenTripManager={() => setTripManagerOpen(true)}
+            onDuplicateTrip={tripManager.duplicateTrip}
+            onInsertDayAfter={tripManager.insertDayAfter}
+            onDeleteDay={tripManager.deleteDay}
             isReadonlyMode={isReadonlyDemoMode}
             tripDistanceText={tripDistanceText}
             dayDistanceText={dayDistanceText}
@@ -522,75 +358,22 @@ function App() {
             onStartWaypointEdit={() => {
               if (activeSegmentId) segmentEditing.startWaypointEdit(activeSegmentId)
             }}
-            onCancelWaypointEdit={() => {
-              setEditingWaypointSegmentId(null)
-              setWaypointDrafts([])
-            }}
+            onCancelWaypointEdit={editing.cancelWaypointEdit}
             onSaveWaypoints={segmentEditing.saveWaypoints}
             onAddWaypoint={segmentEditing.addWaypoint}
-            onUpdateWaypointName={(id, name) => {
-              setWaypointDrafts((prev) =>
-                prev.map((item) =>
-                  item.id === id ? { ...item, name, lat: undefined, lng: undefined, amapId: undefined } : item,
-                ),
-              )
-            }}
-            onSelectWaypointPlace={(id, payload) => {
-              setWaypointDrafts((prev) =>
-                prev.map((item) =>
-                  item.id === id
-                    ? { ...item, name: payload.label, lat: payload.lat, lng: payload.lng, amapId: payload.amapId }
-                    : item,
-                ),
-              )
-            }}
-            onMoveWaypoint={(id, direction) => {
-              setWaypointDrafts((prev) => {
-                const idx = prev.findIndex((item) => item.id === id)
-                if (idx < 0) return prev
-                const target = direction === 'up' ? idx - 1 : idx + 1
-                if (target < 0 || target >= prev.length) return prev
-                const cloned = [...prev]
-                const [item] = cloned.splice(idx, 1)
-                cloned.splice(target, 0, item)
-                return cloned
-              })
-            }}
-            onDeleteWaypoint={(id) => {
-              setWaypointDrafts((prev) => prev.filter((item) => item.id !== id))
-            }}
+            onUpdateWaypointName={editing.updateWaypointName}
+            onSelectWaypointPlace={editing.selectWaypointPlace}
+            onMoveWaypoint={editing.moveWaypoint}
+            onDeleteWaypoint={editing.deleteWaypoint}
             endpointEditMode={editingEndpointsSegmentId === activeSegmentId}
             endpointDraft={segmentEditing.effectiveEndpointDraft}
             onStartEndpointEdit={() => {
               if (activeSegmentId) segmentEditing.startEndpointsEdit(activeSegmentId)
             }}
-            onCancelEndpointEdit={() => {
-              setEditingEndpointsSegmentId(null)
-              setEndpointDraft(null)
-            }}
+            onCancelEndpointEdit={editing.cancelEndpointEdit}
             onSaveEndpoints={segmentEditing.saveEndpoints}
-            onUpdateEndpointText={(field, text) => {
-              setEndpointDraft((prev) => {
-                if (!prev) return prev
-                return {
-                  ...prev,
-                  [field]: text,
-                  ...(field === 'startPoint' ? { startCoord: undefined } : { endCoord: undefined }),
-                }
-              })
-            }}
-            onSelectEndpointPlace={(field, payload) => {
-              setEndpointDraft((prev) => {
-                if (!prev) return prev
-                return {
-                  ...prev,
-                  [field]: payload.label,
-                  ...(field === 'startPoint'
-                    ? { startCoord: { lat: payload.lat, lon: payload.lng } }
-                    : { endCoord: { lat: payload.lat, lon: payload.lng } }),
-                }
-              })
-            }}
+            onUpdateEndpointText={editing.updateEndpointText}
+            onSelectEndpointPlace={editing.selectEndpointPlace}
             onUpdateSegmentScore={(field, value) => {
               if (!activeSegmentId) return
               tripManager.updateSegment(activeSegmentId, (segment) => ({
@@ -611,6 +394,15 @@ function App() {
 
       <footer className="app-mode-footer">当前模式：{appMode === 'readonly-demo' ? 'readonly-demo（演示只读）' : 'normal（正常可编辑）'}</footer>
 
+      <AmapKeySetupDialog
+        open={amapKeyConfig.isOpen}
+        configured={amapKeyConfig.configured}
+        source={amapKeyConfig.source}
+        isSaving={amapKeyConfig.isSaving}
+        error={amapKeyConfig.error}
+        onSave={amapKeyConfig.save}
+        onClose={amapKeyConfig.close}
+      />
     </main>
   )
 }

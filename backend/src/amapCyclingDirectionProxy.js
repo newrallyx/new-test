@@ -15,14 +15,15 @@ async function fetchWithTimeout(targetUrl, timeoutMs) {
   }
 }
 
-export function createCyclingDirectionProxyHandler({ amapWebApiKey }) {
+export function createCyclingDirectionProxyHandler({ amapWebApiKey, getAmapWebApiKey } = {}) {
   return async function handleCyclingDirection(req, res) {
     if (!req.url) {
       res.status(400).json({ ok: false, message: '缺少请求 URL' })
       return
     }
 
-    if (!amapWebApiKey) {
+    const currentAmapWebApiKey = typeof getAmapWebApiKey === 'function' ? getAmapWebApiKey() : amapWebApiKey
+    if (!currentAmapWebApiKey) {
       res.status(500).json({ ok: false, message: 'AMAP_WEB_API_KEY missing' })
       return
     }
@@ -37,7 +38,7 @@ export function createCyclingDirectionProxyHandler({ amapWebApiKey }) {
     }
 
     const targetUrl = new URL('https://restapi.amap.com/v4/direction/bicycling')
-    targetUrl.searchParams.set('key', amapWebApiKey)
+    targetUrl.searchParams.set('key', currentAmapWebApiKey)
     targetUrl.searchParams.set('origin', origin)
     targetUrl.searchParams.set('destination', destination)
 

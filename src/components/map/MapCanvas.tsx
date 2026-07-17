@@ -1,16 +1,24 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react'
 import { MapContainer, Marker, Popup, Polyline, TileLayer } from 'react-leaflet'
 import type { CoordPoint, RouteColorMode, RouteSegment, Waypoint } from '../../types/trip'
+import type { LinkedPhotoRecord, PhotoCoordinate } from '../../types/photo'
 import {
   getScoreGradient,
   getSegmentDisplayColor,
   getSegmentScore,
   UNRATED_SEGMENT_COLOR,
 } from '../../utils/segmentScores'
-import { MapResizeController, ViewportController, WaypointFocusController } from './MapControllers'
-import { controlPointIcon, pointIcons, selectedWaypointIcon } from './mapIcons'
+import {
+  MapResizeController,
+  PhotoFocusController,
+  PhotoPositionPickController,
+  ViewportController,
+  WaypointFocusController,
+} from './MapControllers'
+import { controlPointIcon, pointIcons, selectedPhotoMarkerIcon, selectedWaypointIcon } from './mapIcons'
 import { DEFAULT_MAP_CENTER, toLatLng } from './trackUtils'
 import type { EditMode, SegmentTrack } from './types'
+import { PhotoMarkerLayer } from './PhotoMarkerLayer'
 
 interface MapCanvasProps {
   filteredSegments: RouteSegment[]
@@ -23,6 +31,12 @@ interface MapCanvasProps {
   setDraftLine: Dispatch<SetStateAction<CoordPoint[] | null>>
   controlPointIndices: number[]
   selectedWaypoint: Waypoint | null
+  photos: LinkedPhotoRecord[]
+  selectedPhotoId: string | null
+  onSelectPhoto: (photoId: string) => void
+  photoPositionEditId: string | null
+  photoPositionDraft: PhotoCoordinate | null
+  onPhotoPositionDraftChange: (coordinate: PhotoCoordinate) => void
   loading: boolean
   onEndpointDraftChange: (payload: {
     segmentId: string
@@ -47,6 +61,12 @@ export function MapCanvas({
   setDraftLine,
   controlPointIndices,
   selectedWaypoint,
+  photos,
+  selectedPhotoId,
+  onSelectPhoto,
+  photoPositionEditId,
+  photoPositionDraft,
+  onPhotoPositionDraftChange,
   loading,
   onEndpointDraftChange,
 }: MapCanvasProps) {
@@ -58,6 +78,10 @@ export function MapCanvas({
   )
   const activeLegendMode = routeColorMode === 'default' ? null : routeColorMode
   const showPointMarkers = !isOverviewMode
+  const selectedPhoto = useMemo(
+    () => photos.find((photo) => photo.id === selectedPhotoId) ?? null,
+    [photos, selectedPhotoId],
+  )
 
   return (
     <div className="map-panel-wrapper">
@@ -67,7 +91,7 @@ export function MapCanvas({
         zoomSnap={0.25}
         zoomDelta={0.25}
         wheelPxPerZoomLevel={160}
-        className="map-container"
+        className={photoPositionEditId ? 'map-container photo-position-picking' : 'map-container'}
       >
         <MapResizeController watchKey={mapResizeKey} />
         <TileLayer
@@ -182,7 +206,36 @@ export function MapCanvas({
           </Marker>
         ) : null}
 
+        <PhotoMarkerLayer
+          photos={photos}
+          selectedPhotoId={selectedPhotoId}
+          photoPositionEditId={photoPositionEditId}
+          onSelectPhoto={onSelectPhoto}
+        />
+
+        {photoPositionEditId && photoPositionDraft && (
+          <Marker
+            position={[photoPositionDraft.lat, photoPositionDraft.lon]}
+            icon={selectedPhotoMarkerIcon}
+            zIndexOffset={1200}
+            draggable
+            eventHandlers={{
+              dragend: (event: any) => {
+                const latlng = readDraggedLatLng(event)
+                onPhotoPositionDraftChange({ lat: latlng.lat, lon: latlng.lng })
+              },
+            }}
+          >
+            <Popup>拖动相机图标可微调照片位置</Popup>
+          </Marker>
+        )}
+
         <WaypointFocusController waypoint={selectedWaypoint} />
+        <PhotoFocusController photo={selectedPhoto} />
+        <PhotoPositionPickController
+          active={Boolean(photoPositionEditId)}
+          onPick={onPhotoPositionDraftChange}
+        />
         <ViewportController points={allLatLng} />
       </MapContainer>
 

@@ -9,6 +9,9 @@ import type {
   TripReview,
 } from '../types/trip'
 import { formatDistance, getDayDistanceMeters, getTrackDistanceMeters, getTripDistanceMeters } from '../utils/distance'
+import { formatDurationSummary, summarizeEstimatedDurations } from '../utils/durations'
+import { sortTripsByOrder } from '../utils/tripOrder'
+import { formatTollSummary, summarizeEstimatedTolls } from '../utils/tolls'
 import { useFilteredSegments } from './useFilteredSegments'
 
 interface UseTripWorkspaceParams {
@@ -29,9 +32,7 @@ export function useTripWorkspace({
 
   const workspaceTrips = useMemo(
     () =>
-      trips
-        .filter((trip) => trip.category === activeWorkspace)
-        .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)),
+      sortTripsByOrder(trips.filter((trip) => trip.category === activeWorkspace)),
     [trips, activeWorkspace],
   )
 
@@ -124,6 +125,8 @@ export function useTripWorkspace({
         endDate: trip.endDate,
         segmentCount: trip.days.reduce((sum, day) => sum + day.routeSegments.length, 0),
         tripDistanceText: formatDistance(getTripDistanceMeters(trip)),
+        tripDurationText: formatDurationSummary(summarizeEstimatedDurations(trip.days.flatMap((day) => day.routeSegments))),
+        tripTollText: formatTollSummary(summarizeEstimatedTolls(trip.days.flatMap((day) => day.routeSegments))),
       })),
     [workspaceTrips],
   )
@@ -134,6 +137,22 @@ export function useTripWorkspace({
   )
   const dayDistanceText = useMemo(
     () => formatDistance(selectedDay ? getDayDistanceMeters(selectedDay.routeSegments) : null),
+    [selectedDay],
+  )
+  const tripTollText = useMemo(
+    () => formatTollSummary(summarizeEstimatedTolls(selectedTrip?.days.flatMap((day) => day.routeSegments) ?? [])),
+    [selectedTrip],
+  )
+  const dayTollText = useMemo(
+    () => formatTollSummary(summarizeEstimatedTolls(selectedDay?.routeSegments ?? [])),
+    [selectedDay],
+  )
+  const tripDurationText = useMemo(
+    () => formatDurationSummary(summarizeEstimatedDurations(selectedTrip?.days.flatMap((day) => day.routeSegments) ?? [])),
+    [selectedTrip],
+  )
+  const dayDurationText = useMemo(
+    () => formatDurationSummary(summarizeEstimatedDurations(selectedDay?.routeSegments ?? [])),
     [selectedDay],
   )
 
@@ -150,7 +169,11 @@ export function useTripWorkspace({
   }, [workspaceTrips, filters.tripId, filters.dayId, filters.segmentId])
 
   const summary: RouteSummary = useMemo(
-    () => ({ totalDistanceText: formatDistance(activeSegment ? getTrackDistanceMeters(activeSegment) : null) }),
+    () => ({
+      totalDistanceText: formatDistance(activeSegment ? getTrackDistanceMeters(activeSegment) : null),
+      totalEstimatedDurationText: formatDurationSummary(summarizeEstimatedDurations(activeSegment ? [activeSegment] : [])),
+      totalEstimatedTollText: formatTollSummary(summarizeEstimatedTolls(activeSegment ? [activeSegment] : [])),
+    }),
     [activeSegment],
   )
 
@@ -177,6 +200,10 @@ export function useTripWorkspace({
     tripListItems,
     tripDistanceText,
     dayDistanceText,
+    tripTollText,
+    dayTollText,
+    tripDurationText,
+    dayDurationText,
     filterContext,
     summary,
   }

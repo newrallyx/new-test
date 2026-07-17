@@ -126,10 +126,10 @@ export async function getSegmentRouteCache(segmentId: string): Promise<RouteCach
   }
 }
 
-export async function getAllSegmentRouteCache(): Promise<RouteCacheRecord[]> {
+async function readAllSegmentRouteCache(): Promise<RouteCacheRecord[]> {
+  const db = await openRouteCacheDb()
   try {
-    const db = await openRouteCacheDb()
-    const records = await new Promise<RouteCacheRecord[]>((resolve, reject) => {
+    return await new Promise<RouteCacheRecord[]>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly')
       const store = tx.objectStore(STORE_NAME)
       const request = store.getAll()
@@ -157,8 +157,18 @@ export async function getAllSegmentRouteCache(): Promise<RouteCacheRecord[]> {
       }
       request.onerror = () => reject(request.error)
     })
+  } finally {
     db.close()
-    return records
+  }
+}
+
+export async function getAllSegmentRouteCacheStrict(): Promise<RouteCacheRecord[]> {
+  return readAllSegmentRouteCache()
+}
+
+export async function getAllSegmentRouteCache(): Promise<RouteCacheRecord[]> {
+  try {
+    return await readAllSegmentRouteCache()
   } catch (error) {
     console.error('[routeCacheDb] Failed to read all segment route cache.', error)
     return []

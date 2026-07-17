@@ -1,7 +1,21 @@
+import { useEffect, useMemo, useState } from 'react'
 import PlaceAutocomplete from './PlaceAutocomplete'
 import type { RoutePreference, RouteSegment, RouteSummary, RouteType, Waypoint } from '../types/trip'
 import { formatDistance, getTrackDistanceMeters } from '../utils/distance'
+import {
+  formatDurationUpdatedAt,
+  formatSegmentEstimatedDuration,
+  hasCurrentDurationEstimate,
+} from '../utils/durations'
 import SegmentScoreFields from './SegmentScoreFields'
+import { formatScoreDisplay } from '../utils/segmentScores'
+import { getRoutePreferenceLabel, routePreferenceOptions } from '../utils/routePreference'
+import {
+  formatSegmentEstimatedToll,
+  formatTollDistance,
+  formatTollUpdatedAt,
+  hasCurrentTollEstimate,
+} from '../utils/tolls'
 
 function formatCoordText(coord?: { lat: number; lon: number }): string {
   if (!coord) return '未解析坐标'
@@ -28,6 +42,15 @@ interface SegmentMetaDraft {
   date: string
 }
 
+interface DetailEditDraft {
+  segmentId: string
+  routeMode: RouteType
+  routePreference: RoutePreference
+  scenicScore: number | null
+  difficultyScore: number | null
+  note: string
+}
+
 interface TripListItem {
   id: string
   title: string
@@ -35,6 +58,8 @@ interface TripListItem {
   endDate: string
   segmentCount: number
   tripDistanceText: string
+  tripDurationText: string
+  tripTollText: string
 }
 
 interface MapPlaceholderProps {
@@ -48,12 +73,10 @@ interface MapPlaceholderProps {
   filteredSegments: Array<RouteSegment & { dayDate?: string }>
   summary: RouteSummary
   filterContext: FilterContext
-  editingSegmentId: string | null
   activeSegmentId: string | null
   activeSegment: RouteSegment | null
   activeSegmentDate: string
   segmentMetaDraft: SegmentMetaDraft | null
-  onEditSegment: (segmentId: string) => void
   onDeleteSegment: (payload: { segmentId?: string; index: number; name: string }) => void
   onStartSegmentMetaEdit: (segmentId: string) => void
   onCancelSegmentMetaEdit: () => void
@@ -71,7 +94,6 @@ interface MapPlaceholderProps {
 
   waypoints: Waypoint[]
   onLocateWaypoint: (waypoint: Waypoint) => void
-  waypointEditMode: boolean
   onStartWaypointEdit: () => void
   onCancelWaypointEdit: () => void
   onSaveWaypoints: () => void
@@ -81,7 +103,6 @@ interface MapPlaceholderProps {
   onMoveWaypoint: (id: string, direction: 'up' | 'down') => void
   onDeleteWaypoint: (id: string) => void
 
-  endpointEditMode: boolean
   endpointDraft: EndpointDraft | null
   onStartEndpointEdit: () => void
   onCancelEndpointEdit: () => void
@@ -90,6 +111,9 @@ interface MapPlaceholderProps {
   onSelectEndpointPlace: (field: 'startPoint' | 'endPoint', payload: { label: string; lat: number; lng: number; amapId?: string }) => void
   onUpdateSegmentScore: (field: 'scenicScore' | 'difficultyScore', value: number | null) => void
   onUpdateSegmentNote: (value: string) => void
+  onDetailDraftStateChange: (state: { segmentId: string | null; dirty: boolean }) => void
+  onRefreshRouteEstimate: () => void
+  isRouteEstimateRefreshing: boolean
 }
 
 function MapPlaceholder({
@@ -102,12 +126,10 @@ function MapPlaceholder({
   filteredSegments,
   summary,
   filterContext,
-  editingSegmentId,
   activeSegmentId,
   activeSegment,
   activeSegmentDate,
   segmentMetaDraft,
-  onEditSegment,
   onDeleteSegment,
   onStartSegmentMetaEdit,
   onCancelSegmentMetaEdit,
@@ -122,7 +144,6 @@ function MapPlaceholder({
   canMoveSegmentDown,
   waypoints,
   onLocateWaypoint,
-  waypointEditMode,
   onStartWaypointEdit,
   onCancelWaypointEdit,
   onSaveWaypoints,
@@ -131,7 +152,6 @@ function MapPlaceholder({
   onSelectWaypointPlace,
   onMoveWaypoint,
   onDeleteWaypoint,
-  endpointEditMode,
   endpointDraft,
   onStartEndpointEdit,
   onCancelEndpointEdit,
@@ -140,21 +160,111 @@ function MapPlaceholder({
   onSelectEndpointPlace,
   onUpdateSegmentScore,
   onUpdateSegmentNote,
+  onDetailDraftStateChange,
+  onRefreshRouteEstimate,
+  isRouteEstimateRefreshing,
 }: MapPlaceholderProps) {
+  const [detailDraft, setDetailDraft] = useState<DetailEditDraft | null>(null)
+  const detailEditMode = Boolean(activeSegment && detailDraft?.segmentId === activeSegment.id)
+
+  const detailDraftDirty = useMemo(() => {
+    if (!activeSegment || !detailDraft || detailDraft.segmentId !== activeSegment.id) return false
+    const metaDirty = Boolean(
+      segmentMetaDraft
+      && segmentMetaDraft.segmentId === activeSegment.id
+      && (segmentMetaDraft.name !== activeSegment.name || segmentMetaDraft.date !== activeSegmentDate)
+    )
+    const endpointDirty = Boolean(
+      endpointDraft
+      && endpointDraft.segmentId === activeSegment.id
+      && (
+        endpointDraft.startPoint !== activeSegment.startPoint
+        || endpointDraft.endPoint !== activeSegment.endPoint
+        || JSON.stringify(endpointDraft.startCoord ?? null) !== JSON.stringify(activeSegment.startCoord ?? null)
+        || JSON.stringify(endpointDraft.endCoord ?? null) !== JSON.stringify(activeSegment.endCoord ?? null)
+      )
+    )
+    const waypointDirty = JSON.stringify(waypoints) !== JSON.stringify(activeSegment.waypoints ?? [])
+    return metaDirty
+      || endpointDirty
+      || waypointDirty
+      || detailDraft.routeMode !== routeMode
+      || detailDraft.routePreference !== routePreference
+      || detailDraft.scenicScore !== (activeSegment.scenicScore ?? null)
+      || detailDraft.difficultyScore !== (activeSegment.difficultyScore ?? null)
+      || detailDraft.note !== (activeSegment.note ?? '')
+  }, [activeSegment, activeSegmentDate, detailDraft, endpointDraft, routeMode, routePreference, segmentMetaDraft, waypoints])
+
+  useEffect(() => {
+    onDetailDraftStateChange({
+      segmentId: detailDraft?.segmentId ?? null,
+      dirty: detailDraftDirty,
+    })
+  }, [detailDraft?.segmentId, detailDraftDirty, onDetailDraftStateChange])
+
+  useEffect(() => {
+    if (!detailDraft || detailDraft.segmentId === activeSegmentId) return
+    onCancelSegmentMetaEdit()
+    onCancelEndpointEdit()
+    onCancelWaypointEdit()
+    setDetailDraft(null)
+  }, [activeSegmentId, detailDraft, onCancelEndpointEdit, onCancelSegmentMetaEdit, onCancelWaypointEdit])
+
+  const startDetailEdit = () => {
+    if (!activeSegment || isReadonlyMode) return
+    onStartSegmentMetaEdit(activeSegment.id)
+    onStartEndpointEdit()
+    onStartWaypointEdit()
+    setDetailDraft({
+      segmentId: activeSegment.id,
+      routeMode,
+      routePreference,
+      scenicScore: activeSegment.scenicScore ?? null,
+      difficultyScore: activeSegment.difficultyScore ?? null,
+      note: activeSegment.note ?? '',
+    })
+  }
+
+  const cancelDetailEdit = () => {
+    onCancelSegmentMetaEdit()
+    onCancelEndpointEdit()
+    onCancelWaypointEdit()
+    setDetailDraft(null)
+  }
+
+  const saveDetailEdit = () => {
+    if (!activeSegment || !detailDraft || detailDraft.segmentId !== activeSegment.id) return
+    onSaveSegmentMetaEdit()
+    onSaveEndpoints()
+    onSaveWaypoints()
+    if (detailDraft.routeMode !== routeMode) onChangeRouteMode(detailDraft.routeMode)
+    if (detailDraft.routePreference !== routePreference) onChangeRoutePreference(detailDraft.routePreference)
+    if (detailDraft.scenicScore !== (activeSegment.scenicScore ?? null)) {
+      onUpdateSegmentScore('scenicScore', detailDraft.scenicScore)
+    }
+    if (detailDraft.difficultyScore !== (activeSegment.difficultyScore ?? null)) {
+      onUpdateSegmentScore('difficultyScore', detailDraft.difficultyScore)
+    }
+    if (detailDraft.note !== (activeSegment.note ?? '')) onUpdateSegmentNote(detailDraft.note)
+    setDetailDraft(null)
+  }
+
   // all-trips 时占位区显示“旅程列表模式”；底部真实地图仍由 mapRenderSegments 绘制总览。
   if (placeholderMode === 'trip-list') {
     return (
       <section className="card-section">
-        <h2>3) 轨迹详情区</h2>
+        <h2>轨迹详情</h2>
         <p>当前筛选：旅程【{filterContext.tripName}】 / 日期【{filterContext.dayDate}】 / 路段【{filterContext.segmentName}】</p>
         <p className="hint-text">已切换为“所有旅程列表”视图，便于管理旅程。</p>
         <ul className="trip-placeholder-list">
           {tripListItems.map((trip) => (
             <li key={trip.id} className="trip-placeholder-item">
               <div className="trip-main-meta">
-                <strong>{trip.title}</strong>
+                <strong title={trip.title}>{trip.title}</strong>
                 <small>
                   {trip.startDate} ~ {trip.endDate} · {trip.segmentCount} 条路段 · 旅程总里程：{trip.tripDistanceText}
+                  {' · '}预计行驶时间：{trip.tripDurationText}
+                  {' · '}预估过路费：{trip.tripTollText}
                 </small>
               </div>
               <div className="trip-item-actions">
@@ -184,7 +294,7 @@ function MapPlaceholder({
 
   return (
     <section className="card-section">
-      <h2>3) 轨迹详情区</h2>
+      <h2>轨迹详情</h2>
 
       <p>
         当前筛选：旅程【{filterContext.tripName}】 / 日期【{filterContext.dayDate}】 / 路段【
@@ -199,41 +309,53 @@ function MapPlaceholder({
       )}
 
       {!!activeSegment && (
-        <div className="segment-meta-editor">
-          <p>轨迹信息</p>
-          {!segmentMetaDraft || segmentMetaDraft.segmentId !== activeSegment.id ? (
-            <button type="button" onClick={() => onStartSegmentMetaEdit(activeSegment.id)} disabled={isReadonlyMode}>
-              编辑轨迹信息
-            </button>
+        <div className={`segment-meta-editor ${detailEditMode ? 'editing' : ''}`}>
+          <div className="segment-detail-edit-header">
+            <div>
+              <p>轨迹信息</p>
+              <span>{detailEditMode ? (detailDraftDirty ? '编辑中 · 有未保存更改' : '编辑中') : '只读浏览'}</span>
+            </div>
+            {!detailEditMode ? (
+              <button type="button" onClick={startDetailEdit} disabled={isReadonlyMode}>
+                编辑详情
+              </button>
+            ) : (
+              <div className="segment-detail-edit-actions">
+                <button type="button" className="btn-primary" onClick={saveDetailEdit} disabled={isReadonlyMode}>
+                  保存全部
+                </button>
+                <button type="button" className="btn-secondary" onClick={cancelDetailEdit}>
+                  取消
+                </button>
+              </div>
+            )}
+          </div>
+          {detailEditMode ? (
+            <div className="segment-meta-row">
+              <label>
+                轨迹名称
+                <input
+                  value={segmentMetaDraft?.segmentId === activeSegment.id ? segmentMetaDraft.name : activeSegment.name}
+                  onChange={(event) => onUpdateSegmentMetaDraft({ name: event.target.value })}
+                  disabled={isReadonlyMode}
+                />
+              </label>
+              <label>
+                对应日期
+                <input
+                  type="date"
+                  value={segmentMetaDraft?.segmentId === activeSegment.id ? segmentMetaDraft.date : activeSegmentDate}
+                  onChange={(event) => onUpdateSegmentMetaDraft({ date: event.target.value })}
+                  disabled={isReadonlyMode}
+                />
+              </label>
+            </div>
           ) : (
-            <div className="waypoint-actions">
-              <button type="button" onClick={onSaveSegmentMetaEdit} disabled={isReadonlyMode}>
-                保存
-              </button>
-              <button type="button" onClick={onCancelSegmentMetaEdit}>
-                取消
-              </button>
+            <div className="segment-detail-readonly-grid">
+              <div><small>轨迹名称</small><strong>{activeSegment.name}</strong></div>
+              <div><small>对应日期</small><strong>{activeSegmentDate || '未设置'}</strong></div>
             </div>
           )}
-          <div className="segment-meta-row">
-            <label>
-              轨迹名称
-              <input
-                value={segmentMetaDraft?.segmentId === activeSegment.id ? segmentMetaDraft.name : activeSegment.name}
-                onChange={(event) => onUpdateSegmentMetaDraft({ name: event.target.value })}
-                disabled={isReadonlyMode || segmentMetaDraft?.segmentId !== activeSegment.id}
-              />
-            </label>
-            <label>
-              对应日期
-              <input
-                type="date"
-                value={segmentMetaDraft?.segmentId === activeSegment.id ? segmentMetaDraft.date : activeSegmentDate}
-                onChange={(event) => onUpdateSegmentMetaDraft({ date: event.target.value })}
-                disabled={isReadonlyMode || segmentMetaDraft?.segmentId !== activeSegment.id}
-              />
-            </label>
-          </div>
           <div className="trip-item-actions">
             <button type="button" onClick={() => onMoveSegmentInTrip(activeSegment.id, 'up')} disabled={isReadonlyMode || !canMoveSegmentUp}>
               上移
@@ -256,9 +378,6 @@ function MapPlaceholder({
             <div className="route-item-header">
               <strong title={segment.name}>{segment.name}</strong>
               <div className="route-actions">
-                <button type="button" onClick={() => onEditSegment(segment.id)} disabled={isReadonlyMode}>
-                  {editingSegmentId === segment.id ? '编辑中' : '编辑轨迹'}
-                </button>
                 <button
                   type="button"
                   className="danger-btn"
@@ -272,6 +391,8 @@ function MapPlaceholder({
             <div className="route-item-meta">
               <span>日期：{segment.date || segment.dayDate || '未设置'}</span>
               <span>里程：{formatDistance(getTrackDistanceMeters(segment))}</span>
+              <span>预计行驶时间：{formatSegmentEstimatedDuration(segment)}</span>
+              <span>预估过路费：{formatSegmentEstimatedToll(segment)}</span>
             </div>
           </li>
         ))}
@@ -281,44 +402,71 @@ function MapPlaceholder({
 
       {!!activeSegment && (
         <>
-          <label className="route-type-control">
-          路线类型
-          <select value={routeMode} onChange={(e) => onChangeRouteMode(e.target.value as RouteType)} disabled={isReadonlyMode}>
-            <option value="DRIVING">驾车路线</option>
-            <option value="CYCLING">骑行路线（走小路）</option>
-          </select>
-          </label>
+        {detailEditMode && detailDraft ? (
+          <div className="segment-route-edit-grid">
+            <label className="route-type-control">
+              路线类型
+              <select
+                value={detailDraft.routeMode}
+                onChange={(event) => setDetailDraft((current) => current ? { ...current, routeMode: event.target.value as RouteType } : current)}
+                disabled={isReadonlyMode}
+              >
+                <option value="DRIVING">驾车路线</option>
+                <option value="CYCLING">骑行路线（走小路）</option>
+              </select>
+            </label>
+            <label className="route-type-control">
+              路线策略
+              <select
+                value={detailDraft.routePreference}
+                onChange={(event) => setDetailDraft((current) => current ? { ...current, routePreference: event.target.value as RoutePreference } : current)}
+                disabled={isReadonlyMode || detailDraft.routeMode === 'CYCLING'}
+              >
+                {routePreferenceOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : (
+          <div className="segment-detail-readonly-grid segment-route-readonly">
+            <div><small>路线类型</small><strong>{routeMode === 'CYCLING' ? '骑行路线（走小路）' : '驾车路线'}</strong></div>
+            <div><small>路线策略</small><strong>{getRoutePreferenceLabel(routePreference)}</strong></div>
+          </div>
+        )}
 
-        <label className="route-type-control">
-          路线策略
-          <select
-            value={routePreference}
-            onChange={(e) => onChangeRoutePreference(e.target.value as RoutePreference)}
-            disabled={isReadonlyMode || routeMode === 'CYCLING'}
-          >
-            <option value="HIGHWAY_FIRST">高速优先</option>
-            <option value="AVOID_TOLL">避免收费</option>
-          </select>
-        </label>
+        <div className="segment-detail-section toll-detail-section">
+          <p>路线预估</p>
+          <div className="segment-detail-readonly-grid">
+            <div><small>预计行驶时间</small><strong>{formatSegmentEstimatedDuration(activeSegment)}</strong></div>
+            <div>
+              <small>耗时计算时间</small>
+              <strong>{hasCurrentDurationEstimate(activeSegment) ? formatDurationUpdatedAt(activeSegment.durationUpdatedAt) : '未计算'}</strong>
+            </div>
+            <div><small>预估过路费</small><strong>{formatSegmentEstimatedToll(activeSegment)}</strong></div>
+            <div>
+              <small>收费路段里程</small>
+              <strong>{hasCurrentTollEstimate(activeSegment) ? formatTollDistance(activeSegment.tollDistanceMeters) : '待计算'}</strong>
+            </div>
+            <div><small>费用计算时间</small><strong>{hasCurrentTollEstimate(activeSegment) ? formatTollUpdatedAt(activeSegment.tollUpdatedAt) : '未计算'}</strong></div>
+            <div><small>数据说明</small><strong>{routeMode === 'CYCLING' ? '高德骑行路线预估' : '高德驾车路线预估'}</strong></div>
+          </div>
+          {!isReadonlyMode && (
+            <button
+              type="button"
+              className="btn-secondary toll-refresh-button"
+              onClick={onRefreshRouteEstimate}
+              disabled={isRouteEstimateRefreshing}
+            >
+              {isRouteEstimateRefreshing ? '正在重新计算…' : '重新计算路线、费用和时间'}
+            </button>
+          )}
+          <p className="hint-text">预估时间仅包含路线行驶时间，实际用时受路况、天气及途中停留影响；预估金额以实际收费为准。</p>
+        </div>
 
         <div className="endpoint-section">
           <p>起点 / 终点</p>
-          {!endpointEditMode ? (
-            <button type="button" onClick={onStartEndpointEdit} disabled={isReadonlyMode || !activeSegmentId}>
-              编辑起终点
-            </button>
-          ) : (
-            <div className="waypoint-actions">
-              <button type="button" onClick={onSaveEndpoints} disabled={isReadonlyMode}>
-                保存
-              </button>
-              <button type="button" onClick={onCancelEndpointEdit}>
-                取消
-              </button>
-            </div>
-          )}
-
-          {!endpointEditMode ? (
+          {!detailEditMode ? (
             <div className="endpoint-readonly-grid">
               <div className="endpoint-readonly-card">
                 <small>起点</small>
@@ -334,8 +482,10 @@ function MapPlaceholder({
           ) : (
             <div className="endpoint-grid">
               <div>
-                <small>起点</small>
+                <label className="form-field-label" htmlFor="detail-segment-start">起点</label>
                 <PlaceAutocomplete
+                  inputId="detail-segment-start"
+                  inputLabel="起点"
                   valueText={endpointDraft?.startPoint ?? ''}
                   onValueTextChange={(text) => onUpdateEndpointText('startPoint', text)}
                   onSelect={(result) =>
@@ -347,12 +497,14 @@ function MapPlaceholder({
                     })
                   }
                   placeholder="输入起点地名"
-                  disabled={isReadonlyMode || !endpointEditMode}
+                  disabled={isReadonlyMode || !detailEditMode}
                 />
               </div>
               <div>
-                <small>终点</small>
+                <label className="form-field-label" htmlFor="detail-segment-end">终点</label>
                 <PlaceAutocomplete
+                  inputId="detail-segment-end"
+                  inputLabel="终点"
                   valueText={endpointDraft?.endPoint ?? ''}
                   onValueTextChange={(text) => onUpdateEndpointText('endPoint', text)}
                   onSelect={(result) =>
@@ -364,7 +516,7 @@ function MapPlaceholder({
                     })
                   }
                   placeholder="输入终点地名"
-                  disabled={isReadonlyMode || !endpointEditMode}
+                  disabled={isReadonlyMode || !detailEditMode}
                 />
               </div>
             </div>
@@ -375,20 +527,10 @@ function MapPlaceholder({
           <p>途经点（Waypoints）</p>
           <p>途经点数量：{waypoints.length}</p>
 
-          {!waypointEditMode ? (
-            <button type="button" onClick={onStartWaypointEdit} disabled={isReadonlyMode || !activeSegmentId}>
-              编辑途经点
-            </button>
-          ) : (
+          {detailEditMode && (
             <div className="waypoint-actions">
               <button type="button" onClick={onAddWaypoint} disabled={isReadonlyMode}>
                 + 添加途经点
-              </button>
-              <button type="button" onClick={onSaveWaypoints} disabled={isReadonlyMode}>
-                保存途经点
-              </button>
-              <button type="button" onClick={onCancelWaypointEdit}>
-                取消
               </button>
             </div>
           )}
@@ -398,8 +540,10 @@ function MapPlaceholder({
               <li key={waypoint.id} className="waypoint-item">
                 <span>#{index + 1}</span>
 
-                {waypointEditMode ? (
+                {detailEditMode ? (
                   <PlaceAutocomplete
+                    inputId={`detail-waypoint-${waypoint.id}`}
+                    inputLabel={`途经点 ${index + 1}`}
                     valueText={waypoint.name}
                     onValueTextChange={(text) => onUpdateWaypointName(waypoint.id, text)}
                     onSelect={(result) =>
@@ -424,19 +568,19 @@ function MapPlaceholder({
                 )}
 
                 <div className="waypoint-buttons">
-                  <button type="button" onClick={() => onMoveWaypoint(waypoint.id, 'up')} disabled={isReadonlyMode || !waypointEditMode}>
-                    上移
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMoveWaypoint(waypoint.id, 'down')}
-                    disabled={isReadonlyMode || !waypointEditMode}
-                  >
-                    下移
-                  </button>
-                  <button type="button" onClick={() => onDeleteWaypoint(waypoint.id)} disabled={isReadonlyMode || !waypointEditMode}>
-                    删除
-                  </button>
+                  {detailEditMode && (
+                    <>
+                      <button type="button" onClick={() => onMoveWaypoint(waypoint.id, 'up')} disabled={isReadonlyMode}>
+                        上移
+                      </button>
+                      <button type="button" onClick={() => onMoveWaypoint(waypoint.id, 'down')} disabled={isReadonlyMode}>
+                        下移
+                      </button>
+                      <button type="button" onClick={() => onDeleteWaypoint(waypoint.id)} disabled={isReadonlyMode}>
+                        删除
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -456,26 +600,45 @@ function MapPlaceholder({
           {!waypoints.length && <p className="hint-text">当前路段无途经点。</p>}
         </div>
 
-        <SegmentScoreFields
-          title="轨迹评分"
-          values={{ scenicScore: activeSegment.scenicScore, difficultyScore: activeSegment.difficultyScore }}
-          onChange={onUpdateSegmentScore}
-          disabled={isReadonlyMode}
-          hintText="支持 1.0 ~ 10.0，系统会自动限制范围并规范为 1 位小数。"
-        />
+        {detailEditMode && detailDraft ? (
+          <SegmentScoreFields
+            title="轨迹评分"
+            values={{ scenicScore: detailDraft.scenicScore, difficultyScore: detailDraft.difficultyScore }}
+            onChange={(field, value) => {
+              setDetailDraft((current) => current ? { ...current, [field]: value } : current)
+            }}
+            disabled={isReadonlyMode}
+            hintText="支持 1.0 ~ 10.0，系统会自动限制范围并规范为 1 位小数。"
+          />
+        ) : (
+          <div className="segment-detail-section">
+            <p>轨迹评分</p>
+            <div className="segment-detail-readonly-grid">
+              <div><small>风景评分</small><strong>{formatScoreDisplay(activeSegment.scenicScore)}</strong></div>
+              <div><small>难度评分</small><strong>{formatScoreDisplay(activeSegment.difficultyScore)}</strong></div>
+            </div>
+          </div>
+        )}
 
         <div className="segment-note-section">
-          <p>轨迹备注</p>
-          <textarea
-            value={activeSegment.note ?? ''}
-            onChange={(event) => onUpdateSegmentNote(event.target.value)}
-            placeholder="记录这段轨迹的观感、注意事项、补给信息等。"
-            rows={4}
-            disabled={isReadonlyMode}
-          />
+          <label className="form-field-label" htmlFor="detail-segment-note">轨迹备注</label>
+          {detailEditMode && detailDraft ? (
+            <textarea
+              id="detail-segment-note"
+              value={detailDraft.note}
+              onChange={(event) => setDetailDraft((current) => current ? { ...current, note: event.target.value } : current)}
+              placeholder="记录这段轨迹的观感、注意事项、补给信息等。"
+              rows={4}
+              disabled={isReadonlyMode}
+            />
+          ) : (
+            <p className="segment-note-readonly">{activeSegment.note?.trim() || '暂无备注'}</p>
+          )}
         </div>
 
         <p>总里程：{summary.totalDistanceText}</p>
+        <p>预计行驶时间：{summary.totalEstimatedDurationText}</p>
+        <p>预估过路费：{summary.totalEstimatedTollText}</p>
         </>
       )}
     </section>

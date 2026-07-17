@@ -16,6 +16,10 @@ interface FilterPanelProps {
   isReadonlyMode: boolean
   dayDistanceText: string
   tripDistanceText: string
+  dayTollText: string
+  tripTollText: string
+  dayDurationText: string
+  tripDurationText: string
 }
 
 // 筛选区：按“旅程 / 日期 / 路段”逐级筛选，并处理筛选联动重置。
@@ -33,6 +37,10 @@ function FilterPanel({
   isReadonlyMode,
   dayDistanceText,
   tripDistanceText,
+  dayTollText,
+  tripTollText,
+  dayDurationText,
+  tripDurationText,
 }: FilterPanelProps) {
   const selectedTrip = trips.find((trip) => trip.id === filters.tripId)
 
@@ -47,7 +55,7 @@ function FilterPanel({
 
   return (
     <section className="card-section filter-panel-card">
-      <h2 className="filter-panel-title">2) 筛选区</h2>
+      <h2 className="filter-panel-title">旅程筛选</h2>
 
       <div className="filter-row">
         <label className="trip-filter-field">
@@ -141,7 +149,11 @@ function FilterPanel({
 
       <div className="filter-stats-row">
         {filters.tripId && <p>旅程总里程：{tripDistanceText}</p>}
+        {filters.tripId && <p>旅程预计行驶时间：{tripDurationText}</p>}
+        {filters.tripId && <p>旅程预估过路费：{tripTollText}</p>}
         {filters.dayId && <p>当日总里程：{dayDistanceText}</p>}
+        {filters.dayId && <p>当日预计行驶时间：{dayDurationText}</p>}
+        {filters.dayId && <p>当日预估过路费：{dayTollText}</p>}
       </div>
 
       <div className="route-color-mode-section">

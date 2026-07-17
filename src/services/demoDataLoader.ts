@@ -1,6 +1,8 @@
 import { buildSegmentRouteKey } from '../utils/routeBuildKey'
 import type { CoordPoint, RouteSegment, TripReview, Waypoint } from '../types/trip'
 import { normalizeScore, normalizeSegmentNote } from '../utils/segmentScores'
+import { normalizeTollValue } from '../utils/tolls'
+import { normalizeDurationSeconds } from '../utils/durations'
 
 const DEMO_DATA_PATH = '/demo-data.json'
 
@@ -42,7 +44,10 @@ function normalizeSegment(segment: RouteSegment): RouteSegment {
   const normalized: RouteSegment = {
     ...segment,
     routeType: segment.routeType ?? 'DRIVING',
-    preference: segment.preference === 'AVOID_TOLL' ? 'AVOID_TOLL' : 'HIGHWAY_FIRST',
+    preference:
+      segment.preference === 'AVOID_TOLL' || segment.preference === 'SPEED_FIRST'
+        ? segment.preference
+        : 'HIGHWAY_FIRST',
     startCoord: normalizeCoordPoint(segment.startCoord),
     endCoord: normalizeCoordPoint(segment.endCoord),
     points,
@@ -51,6 +56,11 @@ function normalizeSegment(segment: RouteSegment): RouteSegment {
     scenicScore: normalizeScore(segment.scenicScore),
     difficultyScore: normalizeScore(segment.difficultyScore),
     note: normalizeSegmentNote(segment.note),
+    estimatedDurationSeconds: normalizeDurationSeconds(segment.estimatedDurationSeconds),
+    durationUpdatedAt: typeof segment.durationUpdatedAt === 'string' ? segment.durationUpdatedAt : undefined,
+    estimatedTollYuan: normalizeTollValue(segment.estimatedTollYuan),
+    tollDistanceMeters: normalizeTollValue(segment.tollDistanceMeters),
+    tollUpdatedAt: typeof segment.tollUpdatedAt === 'string' ? segment.tollUpdatedAt : undefined,
   }
 
   return {

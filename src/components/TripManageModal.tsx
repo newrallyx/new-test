@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { Trip } from '../types/trip'
 import { formatDistance, getTripDistanceMeters } from '../utils/distance'
+import { formatDurationSummary, summarizeEstimatedDurations } from '../utils/durations'
+import { formatTollSummary, summarizeEstimatedTolls } from '../utils/tolls'
 
 interface TripManageModalProps {
   trips: Trip[]
@@ -56,13 +58,10 @@ function TripManageModal({
     <section className="card-section sidebar-manage-panel" role="region" aria-label="管理旅程面板">
       <div className="sidebar-manage-header">
         <div>
-          <h2>1) 管理旅程</h2>
-          <p className="hint-text">支持拖拽排序、编辑旅程信息，也可使用上移/下移按钮。</p>
+          <h2>管理旅程</h2>
+          <p className="hint-text">可拖拽卡片排序，也可通过“排序”菜单使用键盘调整顺序。</p>
           {isReadonlyMode && <p className="hint-text">演示版只读模式：管理操作已禁用，仅可浏览。</p>}
         </div>
-        <button type="button" onClick={onClose}>
-          返回左栏
-        </button>
       </div>
 
       {!!errorText && <p className="error-text">{errorText}</p>}
@@ -76,7 +75,7 @@ function TripManageModal({
             <li
               key={trip.id}
               className="trip-manage-item"
-              draggable
+              draggable={!isReadonlyMode && !isEditing}
               aria-disabled={isReadonlyMode}
               onDragStart={() => setDraggingTripId(trip.id)}
               onDragOver={(event) => event.preventDefault()}
@@ -97,23 +96,34 @@ function TripManageModal({
               <div className="trip-main-meta">
                 {!isEditing && (
                   <>
-                    <strong>{trip.title}</strong>
+                    <strong title={trip.title}>{trip.title}</strong>
                     <small>
                       {trip.startDate} ~ {trip.endDate} · {segmentCount} 条路段 · 旅程总里程：
                       {formatDistance(getTripDistanceMeters(trip))}
+                      {' · '}预计行驶时间：
+                      {formatDurationSummary(summarizeEstimatedDurations(trip.days.flatMap((day) => day.routeSegments)))}
+                      {' · '}预估过路费：
+                      {formatTollSummary(summarizeEstimatedTolls(trip.days.flatMap((day) => day.routeSegments)))}
                     </small>
                   </>
                 )}
 
                 {isEditing && draft && (
                   <div className="trip-inline-edit">
+                    <label className="form-field" htmlFor={`trip-title-${trip.id}`}>
+                      <span>旅程标题</span>
                       <input
+                        id={`trip-title-${trip.id}`}
                         value={draft.title}
                         onChange={(event) => setDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))}
                         placeholder="旅程名称"
                         disabled={isReadonlyMode}
                       />
+                    </label>
+                    <label className="form-field" htmlFor={`trip-start-date-${trip.id}`}>
+                      <span>开始日期</span>
                       <input
+                        id={`trip-start-date-${trip.id}`}
                         type="date"
                         value={draft.startDate}
                         onChange={(event) =>
@@ -121,15 +131,21 @@ function TripManageModal({
                         }
                         disabled={isReadonlyMode}
                       />
+                    </label>
+                    <label className="form-field" htmlFor={`trip-end-date-${trip.id}`}>
+                      <span>结束日期</span>
                       <input
+                        id={`trip-end-date-${trip.id}`}
                         type="date"
                         value={draft.endDate}
                         onChange={(event) => setDraft((prev) => (prev ? { ...prev, endDate: event.target.value } : prev))}
                         disabled={isReadonlyMode}
                       />
+                    </label>
                       <div className="trip-item-actions">
                         <button
                           type="button"
+                          className="btn-primary"
                           onClick={() => {
                             if (isReadonlyMode) return
                             if (!draft.title.trim()) {
@@ -158,6 +174,7 @@ function TripManageModal({
                         </button>
                         <button
                           type="button"
+                          className="btn-secondary"
                           onClick={() => {
                             setEditingTripId(null)
                             setDraft(null)
@@ -172,15 +189,17 @@ function TripManageModal({
               </div>
 
               {!isEditing && (
-                <div className="trip-item-actions">
+                <div className="trip-item-actions trip-manage-actions">
                     <button
                       type="button"
+                      className="trip-edit-button"
                       onClick={() => {
                         if (isReadonlyMode) return
                         setEditingTripId(trip.id)
                         setDraft({ title: trip.title, startDate: trip.startDate, endDate: trip.endDate })
                         setErrorText('')
                       }}
+                      disabled={isReadonlyMode}
                     >
                       编辑
                     </button>
@@ -195,29 +214,39 @@ function TripManageModal({
                     >
                       新建副本
                     </button>
-                    <button type="button" onClick={() => onMoveTrip(trip.id, 'up')} disabled={isReadonlyMode || index === 0}>
-                      上移
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onMoveTrip(trip.id, 'down')}
-                      disabled={isReadonlyMode || index === sortedTrips.length - 1}
-                    >
-                      下移
-                    </button>
-                    <button type="button" onClick={() => moveTripToEdge(trip.id, 'top')} disabled={isReadonlyMode || index === 0}>
-                      移到顶部
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveTripToEdge(trip.id, 'bottom')}
-                      disabled={isReadonlyMode || index === sortedTrips.length - 1}
-                    >
-                      移到底部
-                    </button>
-                    <button type="button" className="danger-btn" onClick={() => onDeleteTrip(trip.id)} disabled={isReadonlyMode}>
-                      删除
-                    </button>
+                    <details className="trip-action-menu">
+                      <summary aria-label={`调整“${trip.title}”的排序`}>排序</summary>
+                      <div className="trip-action-menu-panel">
+                        <button type="button" onClick={() => onMoveTrip(trip.id, 'up')} disabled={isReadonlyMode || index === 0}>
+                          上移
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onMoveTrip(trip.id, 'down')}
+                          disabled={isReadonlyMode || index === sortedTrips.length - 1}
+                        >
+                          下移
+                        </button>
+                        <button type="button" onClick={() => moveTripToEdge(trip.id, 'top')} disabled={isReadonlyMode || index === 0}>
+                          移到顶部
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTripToEdge(trip.id, 'bottom')}
+                          disabled={isReadonlyMode || index === sortedTrips.length - 1}
+                        >
+                          移到底部
+                        </button>
+                      </div>
+                    </details>
+                    <details className="trip-action-menu trip-more-menu">
+                      <summary aria-label={`打开“${trip.title}”的更多操作`}>更多</summary>
+                      <div className="trip-action-menu-panel">
+                        <button type="button" className="danger-btn" onClick={() => onDeleteTrip(trip.id)} disabled={isReadonlyMode}>
+                          删除旅程
+                        </button>
+                      </div>
+                    </details>
                 </div>
               )}
             </li>

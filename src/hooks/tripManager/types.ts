@@ -31,6 +31,8 @@ export interface EditingStateControls {
 }
 
 export type BlockReadonlyWrite = (actionName: string) => boolean
+export type DeleteLinkedPhotos = (photoIds: string[]) => void
+export type DeleteTripPhotoData = (tripId: string, segmentIds: string[]) => Promise<void>
 export type FindSegmentRef = (segmentId: string, data?: TripReview) => SegmentRef | null
 export type SetFilters = Dispatch<SetStateAction<FilterState>>
 export type SetTripReview = Dispatch<SetStateAction<TripReview>>

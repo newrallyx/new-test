@@ -4,6 +4,7 @@ import type { Trip } from '../../types/trip'
 import { addDaysToIsoDate, sortTripDaysByDate } from '../../utils/date'
 import type {
   BlockReadonlyWrite,
+  DeleteLinkedPhotos,
   EditingStateControls,
   SetFilters,
   SetTripReview,
@@ -15,6 +16,7 @@ interface UseDayActionsParams extends EditingStateControls {
   setFilters: SetFilters
   setTripReview: SetTripReview
   blockReadonlyWrite: BlockReadonlyWrite
+  onDeleteLinkedPhotos: DeleteLinkedPhotos
 }
 
 export function useDayActions({
@@ -22,6 +24,7 @@ export function useDayActions({
   setFilters,
   setTripReview,
   blockReadonlyWrite,
+  onDeleteLinkedPhotos,
   setEditingSegmentId,
   setEditingWaypointSegmentId,
   setWaypointDrafts,
@@ -100,9 +103,11 @@ export function useDayActions({
     if (!confirmed) return false
 
     const deletedSegmentIds = new Set(sourceDay.routeSegments.map((segment) => segment.id))
+    const deletedPhotoIds = sourceDay.routeSegments.flatMap((segment) => segment.photoIds ?? [])
     for (const segmentId of deletedSegmentIds) {
       void deleteSegmentRouteCache(segmentId)
     }
+    if (deletedPhotoIds.length > 0) onDeleteLinkedPhotos(deletedPhotoIds)
 
     const fallbackDay = orderedDays[sourceDayIndex - 1] ?? orderedDays[sourceDayIndex + 1] ?? null
 
@@ -141,7 +146,7 @@ export function useDayActions({
     })
     resetEditingState()
     return true
-  }, [blockReadonlyWrite, resetEditingState, setFilters, setTripReview, workspaceTrips])
+  }, [blockReadonlyWrite, onDeleteLinkedPhotos, resetEditingState, setFilters, setTripReview, workspaceTrips])
 
   return { insertDayAfter, deleteDay }
 }

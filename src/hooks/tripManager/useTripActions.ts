@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
 import { deleteSegmentRouteCache, getSegmentRouteCache, saveSegmentRouteCache } from '../../services/routeCacheDb'
 import type { FilterState, Trip, TripCategory, TripReview } from '../../types/trip'
+import { normalizeTripOrders, sortTripsByOrder } from '../../utils/tripOrder'
 import type {
   BlockReadonlyWrite,
+  DeleteTripPhotoData,
   EditingStateControls,
   SetFilters,
   SetTripReview,
@@ -17,6 +19,7 @@ interface UseTripActionsParams extends EditingStateControls {
   tripReview: TripReview
   setTripReview: SetTripReview
   blockReadonlyWrite: BlockReadonlyWrite
+  onDeleteTripPhotoData: DeleteTripPhotoData
 }
 
 export function useTripActions({
@@ -27,6 +30,7 @@ export function useTripActions({
   tripReview,
   setTripReview,
   blockReadonlyWrite,
+  onDeleteTripPhotoData,
   editingSegmentId,
   setEditingSegmentId,
   editingWaypointSegmentId,
@@ -48,20 +52,23 @@ export function useTripActions({
 
   const addTrip = useCallback((payload: { title: string; startDate: string; endDate: string }) => {
     if (blockReadonlyWrite('addTrip')) return
-    setTripReview((prev) => ({
-      trips: [
-        ...prev.trips,
-        {
-          id: createId('trip'),
-          title: payload.title,
-          startDate: payload.startDate,
-          endDate: payload.endDate,
-          category: activeWorkspace,
-          order: prev.trips.filter((trip) => trip.category === activeWorkspace).length,
-          days: [],
-        },
-      ],
-    }))
+    setTripReview((prev) => {
+      const normalizedTrips = normalizeTripOrders(prev.trips)
+      return {
+        trips: normalizeTripOrders([
+          ...normalizedTrips,
+          {
+            id: createId('trip'),
+            title: payload.title,
+            startDate: payload.startDate,
+            endDate: payload.endDate,
+            category: activeWorkspace,
+            order: normalizedTrips.filter((trip) => trip.category === activeWorkspace).length,
+            days: [],
+          },
+        ]),
+      }
+    })
   }, [activeWorkspace, blockReadonlyWrite, setTripReview])
 
   const deleteTrip = useCallback((tripId: string) => {
@@ -76,27 +83,34 @@ export function useTripActions({
     )
     if (!confirmed) return
 
-    for (const segmentId of deletedSegmentIds) {
-      void deleteSegmentRouteCache(segmentId)
-    }
+    void (async () => {
+      try {
+        await onDeleteTripPhotoData(tripId, Array.from(deletedSegmentIds))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        window.alert(`照片库清理失败，旅程尚未删除：${message}`)
+        return
+      }
 
-    setTripReview((prev) => ({ trips: prev.trips.filter((trip) => trip.id !== tripId) }))
+      await Promise.allSettled(Array.from(deletedSegmentIds, (segmentId) => deleteSegmentRouteCache(segmentId)))
+      setTripReview((prev) => ({ trips: normalizeTripOrders(prev.trips.filter((trip) => trip.id !== tripId)) }))
 
-    if (filters.tripId === tripId) {
-      setFilters({ tripId: '', dayId: '', segmentId: '' })
-    }
+      if (filters.tripId === tripId) {
+        setFilters({ tripId: '', dayId: '', segmentId: '' })
+      }
 
-    if (editingSegmentId && deletedSegmentIds.has(editingSegmentId)) setEditingSegmentId(null)
-    if (editingWaypointSegmentId && deletedSegmentIds.has(editingWaypointSegmentId)) {
-      setEditingWaypointSegmentId(null)
-      setWaypointDrafts([])
-      setSelectedWaypointId(null)
-    }
-    if (editingEndpointsSegmentId && deletedSegmentIds.has(editingEndpointsSegmentId)) {
-      setEditingEndpointsSegmentId(null)
-      setEndpointDraft(null)
-    }
-  }, [blockReadonlyWrite, editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, filters.tripId, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setFilters, setSelectedWaypointId, setTripReview, setWaypointDrafts, workspaceTrips])
+      if (editingSegmentId && deletedSegmentIds.has(editingSegmentId)) setEditingSegmentId(null)
+      if (editingWaypointSegmentId && deletedSegmentIds.has(editingWaypointSegmentId)) {
+        setEditingWaypointSegmentId(null)
+        setWaypointDrafts([])
+        setSelectedWaypointId(null)
+      }
+      if (editingEndpointsSegmentId && deletedSegmentIds.has(editingEndpointsSegmentId)) {
+        setEditingEndpointsSegmentId(null)
+        setEndpointDraft(null)
+      }
+    })()
+  }, [blockReadonlyWrite, editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, filters.tripId, onDeleteTripPhotoData, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setFilters, setSelectedWaypointId, setTripReview, setWaypointDrafts, workspaceTrips])
 
   const updateTrip = useCallback((tripId: string, patch: { title: string; startDate: string; endDate: string }): boolean => {
     if (blockReadonlyWrite('updateTrip')) return false
@@ -137,6 +151,7 @@ export function useTripActions({
           return {
             ...segment,
             id: copiedSegmentId,
+            photoIds: undefined,
             points: segment.points?.map((point) => ({ ...point })),
             waypoints: segment.waypoints?.map((waypoint) => ({
               ...waypoint,
@@ -150,9 +165,7 @@ export function useTripActions({
     setTripReview((prev) => {
       if (!prev.trips.some((trip) => trip.id === sourceTrip.id)) return prev
 
-      const scopedTrips = prev.trips
-        .filter((trip) => trip.category === sourceTrip.category)
-        .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+      const scopedTrips = sortTripsByOrder(prev.trips.filter((trip) => trip.category === sourceTrip.category))
       const sourceIndex = scopedTrips.findIndex((trip) => trip.id === sourceTrip.id)
       if (sourceIndex < 0) return prev
 
@@ -201,7 +214,7 @@ export function useTripActions({
   const moveTrip = useCallback((tripId: string, direction: 'up' | 'down') => {
     if (blockReadonlyWrite('moveTrip')) return
     setTripReview((prev) => {
-      const scopedTrips = prev.trips.filter((trip) => trip.category === activeWorkspace)
+      const scopedTrips = sortTripsByOrder(prev.trips.filter((trip) => trip.category === activeWorkspace))
       const idx = scopedTrips.findIndex((trip) => trip.id === tripId)
       if (idx < 0) return prev
       const target = direction === 'up' ? idx - 1 : idx + 1
@@ -223,8 +236,9 @@ export function useTripActions({
   const reorderTrips = useCallback((orderedTripIds: string[]) => {
     if (blockReadonlyWrite('reorderTrips')) return
     setTripReview((prev) => {
-      const scopedTrips = prev.trips.filter((trip) => trip.category === activeWorkspace)
+      const scopedTrips = sortTripsByOrder(prev.trips.filter((trip) => trip.category === activeWorkspace))
       if (orderedTripIds.length !== scopedTrips.length) return prev
+      if (new Set(orderedTripIds).size !== orderedTripIds.length) return prev
       const scopedMap = new Map(scopedTrips.map((trip) => [trip.id, trip]))
       const orderedScoped = orderedTripIds
         .map((id) => scopedMap.get(id))

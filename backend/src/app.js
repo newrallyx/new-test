@@ -1,10 +1,19 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import express from 'express'
-import cors from 'cors'
 import { createInputTipsProxyHandler } from './amapInputTipsProxy.js'
 import { createDirectionProxyHandler } from './amapDirectionProxy.js'
 import { createCyclingDirectionProxyHandler } from './amapCyclingDirectionProxy.js'
+
+export const LOCAL_API_CLIENT_HEADER = 'x-roadtrip-client'
+export const LOCAL_API_CLIENT_VALUE = 'roadtrip-local-app'
+
+const DEFAULT_ALLOWED_LOCAL_ORIGINS = [
+  'http://127.0.0.1:4173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'http://localhost:5173',
+]
 
 function cleanAmapKey(value) {
   if (typeof value !== 'string') return ''
@@ -35,8 +44,15 @@ function writeStoredAmapKey(filePath, amapWebApiKey) {
   fs.writeFileSync(filePath, `${JSON.stringify({ AMAP_WEB_API_KEY: amapWebApiKey }, null, 2)}\n`, 'utf8')
 }
 
-export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApiKeySetup = true } = {}) {
+export function createApp({
+  amapWebApiKey,
+  staticDir,
+  apiKeyConfigPath,
+  allowApiKeySetup = true,
+  allowedOrigins = DEFAULT_ALLOWED_LOCAL_ORIGINS,
+} = {}) {
   const app = express()
+  const allowedOriginSet = new Set(allowedOrigins)
   const environmentAmapKey = cleanAmapKey(amapWebApiKey)
   const storedAmapKey = readStoredAmapKey(apiKeyConfigPath)
   let currentAmapWebApiKey = environmentAmapKey || storedAmapKey
@@ -44,12 +60,23 @@ export function createApp({ amapWebApiKey, staticDir, apiKeyConfigPath, allowApi
 
   const getAmapWebApiKey = () => currentAmapWebApiKey
 
-  app.use(cors())
-  app.use(express.json())
-
   app.get('/healthz', (_req, res) => {
     res.status(200).json({ ok: true })
   })
+
+  app.use('/api', (req, res, next) => {
+    const origin = req.get('origin')
+    const hasTrustedOrigin = !origin || allowedOriginSet.has(origin)
+    const hasTrustedClientHeader = req.get(LOCAL_API_CLIENT_HEADER) === LOCAL_API_CLIENT_VALUE
+
+    if (!hasTrustedOrigin || !hasTrustedClientHeader) {
+      res.status(403).json({ ok: false, message: 'Request is not authorized for the local application.' })
+      return
+    }
+
+    next()
+  })
+  app.use(express.json({ limit: '64kb' }))
 
   app.get('/api/config/amap-key', (_req, res) => {
     res.status(200).json({

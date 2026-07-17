@@ -1,6 +1,6 @@
 import type { TripReview } from '../types/trip'
-import { getAllSegmentRouteCache, type RouteCacheRecord } from './routeCacheDb'
-import { toPersistedTripReview } from './tripStorage'
+import { getAllSegmentRouteCache, type RouteCacheRecord } from './routeCacheDb.ts'
+import { toPersistedTripReview } from './tripStorage.ts'
 
 const BACKUP_SCHEMA = 'roadtrip-retrospective-backup'
 const BACKUP_VERSION = 1

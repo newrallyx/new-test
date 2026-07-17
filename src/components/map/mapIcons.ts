@@ -44,3 +44,29 @@ export const selectedWaypointIcon = L.divIcon({
   iconSize: [24, 24],
   iconAnchor: [12, 12],
 })
+
+export const photoMarkerIcon = L.divIcon({
+  className: 'photo-marker-icon-wrapper',
+  html: '<div class="photo-marker-icon" aria-hidden="true">📷</div>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -14],
+})
+
+export const selectedPhotoMarkerIcon = L.divIcon({
+  className: 'photo-marker-icon-wrapper',
+  html: '<div class="photo-marker-icon selected" aria-hidden="true">📷</div>',
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -17],
+})
+
+export function createPhotoClusterIcon(count: number): DivIcon {
+  const size = count >= 100 ? 48 : count >= 10 ? 42 : 36
+  return L.divIcon({
+    className: 'photo-marker-icon-wrapper',
+    html: `<div class="photo-cluster-icon" aria-label="${count} 张照片">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  })
+}

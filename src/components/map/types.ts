@@ -20,7 +20,17 @@ export interface ResolvedRoutePatch {
   segmentId: string
   points: CoordPoint[]
   distanceMeters: number | null
+  estimatedDurationSeconds: number | null
+  durationUpdatedAt?: string
+  estimatedTollYuan: number | null
+  tollDistanceMeters: number | null
+  tollUpdatedAt?: string
   routeBuildKey: string
+}
+
+export interface RouteRefreshRequest {
+  segmentId: string | null
+  revision: number
 }
 
 export interface TrackSavePayload {

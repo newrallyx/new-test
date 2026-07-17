@@ -34,6 +34,7 @@ function SegmentScoreFields({ values, onChange, disabled = false, title, hintTex
             <div className="segment-score-inputs">
               <input
                 type="range"
+                aria-label={`${config.label}滑块`}
                 min="1"
                 max="10"
                 step="0.1"
@@ -44,6 +45,7 @@ function SegmentScoreFields({ values, onChange, disabled = false, title, hintTex
               />
               <input
                 type="number"
+                aria-label={`${config.label}数值`}
                 min="1"
                 max="10"
                 step="0.1"

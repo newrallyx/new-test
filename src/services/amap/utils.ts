@@ -14,9 +14,10 @@ export function parseLocationText(location: string): { lat: number; lng: number 
 }
 
 export function preferenceToStrategy(preference: RoutePreference): string {
-  if (preference === 'HIGHWAY_FIRST') return '0'
+  if (preference === 'HIGHWAY_FIRST') return '19'
+  if (preference === 'SPEED_FIRST') return '0'
   if (preference === 'AVOID_TOLL') return '1'
-  return '0'
+  return '19'
 }
 
 export function buildRouteKey(points: DrivingRequestPoint[], preference: RoutePreference): string {

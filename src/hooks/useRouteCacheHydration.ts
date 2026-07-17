@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react'
 import { getSegmentRouteCache } from '../services/routeCacheDb'
-import { buildSegmentRouteKey } from '../utils/routeBuildKey'
+import { canDisplaySegmentRouteCache } from '../utils/routeBuildKey'
 import type { CoordPoint, TripReview } from '../types/trip'
 
 interface UseRouteCacheHydrationParams {
@@ -25,8 +25,10 @@ export function useRouteCacheHydration({ trips, setTripReview, enabled = true }:
               const cache = await getSegmentRouteCache(segment.id)
               if (!cache) continue
 
-              const buildKey = buildSegmentRouteKey(segment)
-              if (cache.routeBuildKey !== buildKey) continue
+              // Current and legacy cache keys both describe the same route
+              // inputs. Legacy geometry remains displayable while estimates
+              // are refreshed later with the current AMap strategy.
+              if (!canDisplaySegmentRouteCache(segment, cache.routeBuildKey)) continue
 
               const samePoints =
                 Array.isArray(segment.points) &&

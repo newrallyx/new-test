@@ -91,10 +91,10 @@ function AmapKeySetupDialog({
           {error && <p className="amap-key-dialog-error">{error}</p>}
 
           <div className="amap-key-dialog-actions">
-            <button type="button" onClick={onClose} disabled={isSaving}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={isSaving}>
               稍后设置
             </button>
-            <button type="submit" disabled={isSaving || !keyDraft.trim()}>
+            <button type="submit" className="btn-primary" disabled={isSaving || !keyDraft.trim()}>
               {isSaving ? '保存中...' : configured ? '替换 Key' : '保存并启用'}
             </button>
           </div>

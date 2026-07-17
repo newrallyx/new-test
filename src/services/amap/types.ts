@@ -42,7 +42,12 @@ export interface DrivingRouteResult {
   polyline: Array<[number, number]>
   distanceText: string
   durationText: string
+  durationSeconds?: number
   distanceMeters?: number
+  estimatedTollYuan?: number
+  tollDistanceMeters?: number
+  tollUpdatedAt?: string
+  durationUpdatedAt?: string
   routeKey: string
   fromCache?: boolean
 }
@@ -56,7 +61,10 @@ export interface RouteApiResult {
   polyline: Array<[number, number]>
   distanceText: string
   durationText: string
+  durationSeconds?: number
   distanceMeters?: number
+  estimatedTollYuan?: number
+  tollDistanceMeters?: number
 }
 
 export interface PlannedRouteResponse {

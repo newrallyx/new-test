@@ -32,6 +32,8 @@ interface UseTripManagerParams {
   setTripReview: Dispatch<SetStateAction<TripReview>>
   tripReview: TripReview
   activeSegmentId: string | null
+  onDeleteLinkedPhotos: (photoIds: string[]) => void
+  onDeleteTripPhotoData: (tripId: string, segmentIds: string[]) => Promise<void>
 }
 
 export type { EndpointDraft } from './tripManager/types'
@@ -55,6 +57,8 @@ export function useTripManager({
   setTripReview,
   tripReview,
   activeSegmentId,
+  onDeleteLinkedPhotos,
+  onDeleteTripPhotoData,
 }: UseTripManagerParams) {
   const blockReadonlyWrite = useCallback((actionName: string): boolean => {
     if (!isReadonlyMode) return false
@@ -104,6 +108,7 @@ export function useTripManager({
     setTripReview,
     blockReadonlyWrite,
     findSegmentRef,
+    onDeleteLinkedPhotos,
   })
 
   const dayActions = useDayActions({
@@ -112,6 +117,7 @@ export function useTripManager({
     setFilters,
     setTripReview,
     blockReadonlyWrite,
+    onDeleteLinkedPhotos,
   })
 
   const tripActions = useTripActions({
@@ -123,6 +129,7 @@ export function useTripManager({
     tripReview,
     setTripReview,
     blockReadonlyWrite,
+    onDeleteTripPhotoData,
   })
 
   return {

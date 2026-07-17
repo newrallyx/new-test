@@ -1,6 +1,6 @@
 // 旅程领域类型：统一定义 Trip / TripDay / RouteSegment 以及筛选与汇总类型。
 
-export type RoutePreference = 'HIGHWAY_FIRST' | 'AVOID_TOLL'
+export type RoutePreference = 'SPEED_FIRST' | 'HIGHWAY_FIRST' | 'AVOID_TOLL'
 export type RouteType = 'DRIVING' | 'CYCLING'
 export type TripCategory = 'review' | 'plan'
 export type RouteColorMode = 'default' | 'scenic' | 'difficulty'
@@ -40,11 +40,17 @@ export interface RouteSegment {
   endPlaceId?: string
   points?: CoordPoint[]
   distanceMeters?: number
+  estimatedDurationSeconds?: number
+  durationUpdatedAt?: string
+  estimatedTollYuan?: number
+  tollDistanceMeters?: number
+  tollUpdatedAt?: string
   routeBuildKey?: string
   waypoints?: Waypoint[]
   scenicScore?: number | null
   difficultyScore?: number | null
   note?: string
+  photoIds?: string[]
 }
 
 export interface TripDay {
@@ -75,4 +81,6 @@ export interface FilterState {
 
 export interface RouteSummary {
   totalDistanceText: string
+  totalEstimatedDurationText: string
+  totalEstimatedTollText: string
 }

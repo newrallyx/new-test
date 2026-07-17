@@ -1,3 +1,5 @@
+import { LOCAL_API_CLIENT_HEADERS } from './localApiClient.ts'
+
 export type AmapKeySource = 'environment' | 'local-config' | null
 
 export interface AmapKeyStatus {
@@ -21,7 +23,9 @@ async function readJsonResponse(response: Response): Promise<AmapKeyStatusRespon
 }
 
 export async function getAmapKeyStatus(): Promise<AmapKeyStatus> {
-  const response = await fetch('/api/config/amap-key')
+  const response = await fetch('/api/config/amap-key', {
+    headers: LOCAL_API_CLIENT_HEADERS,
+  })
   const payload = await readJsonResponse(response)
   if (!response.ok || !payload.ok) {
     throw new Error(payload.message || '无法读取地图服务配置。')
@@ -36,7 +40,10 @@ export async function getAmapKeyStatus(): Promise<AmapKeyStatus> {
 export async function saveAmapKey(key: string): Promise<AmapKeyStatus> {
   const response = await fetch('/api/config/amap-key', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      ...LOCAL_API_CLIENT_HEADERS,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ key: key.trim() }),
   })
   const payload = await readJsonResponse(response)

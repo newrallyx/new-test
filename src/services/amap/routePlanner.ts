@@ -1,4 +1,5 @@
 import type { RoutePreference } from '../../types/trip'
+import { sumCompleteDurationSeconds } from '../../utils/durations'
 import { requestCyclingRoute, requestDrivingRoute } from './routeApi'
 import type {
   AMapServiceError,
@@ -106,7 +107,12 @@ async function planDrivingRouteRaw(
         polyline: result.polyline,
         distanceText: result.distanceText,
         durationText: result.durationText,
+        durationSeconds: result.durationSeconds,
         distanceMeters: result.distanceMeters,
+        estimatedTollYuan: result.estimatedTollYuan,
+        tollDistanceMeters: result.tollDistanceMeters,
+        tollUpdatedAt: typeof result.estimatedTollYuan === 'number' ? new Date().toISOString() : undefined,
+        durationUpdatedAt: typeof result.durationSeconds === 'number' ? new Date().toISOString() : undefined,
         routeKey,
       },
       error: null,
@@ -122,9 +128,10 @@ async function planDrivingRouteRaw(
 export async function planDrivingRoute(
   points: DrivingRequestPoint[],
   preference: RoutePreference,
+  options: { forceRefresh?: boolean } = {},
 ): Promise<PlannedRouteResponse> {
   const routeKey = buildRouteKey(points, preference)
-  const cached = routeCache.get(routeKey)
+  const cached = options.forceRefresh ? undefined : routeCache.get(routeKey)
   if (cached) return { route: { ...cached, fromCache: true }, error: null }
 
   return withRouteInFlightDedup(`DRIVING::${routeKey}`, async () => {
@@ -147,6 +154,7 @@ export async function planDrivingRoute(
 
 export async function planCyclingRoute(
   points: DrivingRequestPoint[],
+  options: { forceRefresh?: boolean } = {},
 ): Promise<PlannedRouteResponse> {
   if (points.length < 2) {
     return {
@@ -156,28 +164,31 @@ export async function planCyclingRoute(
   }
 
   const routeKey = `${points.map(toLonLatText).join('|')}|CYCLING`
-  const cached = routeCache.get(routeKey)
+  const cached = options.forceRefresh ? undefined : routeCache.get(routeKey)
   if (cached) return { route: { ...cached, fromCache: true }, error: null }
 
   const run = async () => {
     await sleep(ROUTE_REQUEST_DELAY_MS)
     const polyline: Array<[number, number]> = []
     let distanceMeters = 0
-    let durationSeconds = 0
+    const legDurations: Array<number | undefined> = []
 
     for (let index = 0; index < points.length - 1; index += 1) {
       const leg = await requestCyclingRoute(toLonLatText(points[index]), toLonLatText(points[index + 1]))
       distanceMeters += Number(leg.distanceText.replace(/[^\d.]/g, '')) || 0
-      durationSeconds += Number(leg.durationText.replace(/[^\d.]/g, '')) || 0
+      legDurations.push(leg.durationSeconds)
       polyline.push(...leg.polyline)
     }
 
     if (!polyline.length) throw new Error('骑行规划失败')
 
+    const durationSeconds = sumCompleteDurationSeconds(legDurations)
     const route: DrivingRouteResult = {
       polyline,
       distanceText: `${Math.round(distanceMeters)} 米`,
-      durationText: `${Math.round(durationSeconds)} 秒`,
+      durationText: typeof durationSeconds === 'number' ? `${durationSeconds} 秒` : '未知',
+      durationSeconds,
+      durationUpdatedAt: typeof durationSeconds === 'number' ? new Date().toISOString() : undefined,
       distanceMeters: Math.round(distanceMeters),
       routeKey,
     }

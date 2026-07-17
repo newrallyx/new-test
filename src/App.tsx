@@ -1,8 +1,10 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { appMode, isReadonlyDemoMode } from './config/appMode'
 import AmapKeySetupDialog from './components/AmapKeySetupDialog'
 import FilterPanel from './components/FilterPanel'
 import MapPanel from './components/MapPanel'
 import MapPlaceholder from './components/MapPlaceholder'
+import SegmentPhotoGallery from './components/SegmentPhotoGallery'
 import TripEditor from './components/TripEditor'
 import TripManageModal from './components/TripManageModal'
 import { useAmapKeyConfig } from './hooks/useAmapKeyConfig'
@@ -16,7 +18,20 @@ import { useTripManager } from './hooks/useTripManager'
 import { useTripReviewState } from './hooks/useTripReviewState'
 import { useTripWorkspace } from './hooks/useTripWorkspace'
 import { normalizeSegmentNote, normalizeScore } from './utils/segmentScores'
+import { electronPhotoMetadataRepository } from './services/electronPhotoMetadataRepository'
+import { collectReferencedPhotoIds, deleteLinkedPhotoRecords, removePhotoReferences } from './services/photoCleanup'
+import type { LinkedPhotoRecord, PhotoCoordinate } from './types/photo'
+import { createManualMapPosition } from './utils/photoCoordinates'
 import './styles/app.css'
+
+interface PhotoPositionEditState {
+  photoId: string
+  originalFilename: string
+  draft: PhotoCoordinate | null
+}
+
+type CompactPanelTab = 'editor' | 'details' | 'photos'
+type DetailPanelTab = 'details' | 'photos'
 
 function App() {
   const {
@@ -24,8 +39,60 @@ function App() {
     setTripReview,
     demoLoading: isLoading,
     demoError: loadError,
+    storageIssue,
+    retryTripPersistence,
+    downloadTripRecoveryCopy,
+    canResetCorruptTripStorage,
+    resetCorruptTripStorage,
   } = useTripReviewState()
   const amapKeyConfig = useAmapKeyConfig(!isReadonlyDemoMode)
+  const orphanCleanupStarted = useRef(false)
+  const [photoCleanupFailures, setPhotoCleanupFailures] = useState<string[]>([])
+  const [compactPanelTab, setCompactPanelTab] = useState<CompactPanelTab>('editor')
+  const [detailPanelTab, setDetailPanelTab] = useState<DetailPanelTab>('details')
+  const [detailDraftState, setDetailDraftState] = useState<{ segmentId: string | null; dirty: boolean }>({
+    segmentId: null,
+    dirty: false,
+  })
+
+  const runPhotoCleanup = useCallback(async (photoIds: string[]) => {
+    if (!window.roadtripDesktop?.photoLibrary || photoIds.length === 0) return
+    const result = await deleteLinkedPhotoRecords(electronPhotoMetadataRepository, photoIds)
+    if (result.failures.length > 0) {
+      setPhotoCleanupFailures(result.failures.map((failure) => failure.photoId))
+      console.error('[photoCleanup] Failed to delete linked photo records.', result.failures)
+    } else {
+      setPhotoCleanupFailures([])
+    }
+  }, [])
+
+  const deleteLinkedPhotos = useCallback((photoIds: string[]) => {
+    void runPhotoCleanup(photoIds).catch((error) => {
+      setPhotoCleanupFailures(photoIds)
+      console.error('[photoCleanup] Failed to delete linked photo records.', error)
+    })
+  }, [runPhotoCleanup])
+
+  const deleteTripPhotoData = useCallback(async (tripId: string, segmentIds: string[]) => {
+    if (!window.roadtripDesktop?.photoLibrary) return
+    await electronPhotoMetadataRepository.deleteTripData(tripId, segmentIds)
+    setPhotoCleanupFailures([])
+  }, [])
+
+  useEffect(() => {
+    if (orphanCleanupStarted.current || isReadonlyDemoMode || !window.roadtripDesktop?.photoLibrary) return
+    orphanCleanupStarted.current = true
+    const referencedPhotoIds = collectReferencedPhotoIds(tripReview)
+    void electronPhotoMetadataRepository.cleanupOrphans(referencedPhotoIds)
+      .then((result) => {
+        if (result.missingReferencedPhotoIds.length > 0) {
+          setTripReview((current) => removePhotoReferences(current, result.missingReferencedPhotoIds))
+        }
+      })
+      .catch((error) => {
+        console.error('[photoCleanup] Failed to clean orphaned photo data.', error)
+      })
+  }, [tripReview])
 
   const editing = useAppEditingState()
   const {
@@ -73,9 +140,46 @@ function App() {
     tripListItems,
     tripDistanceText,
     dayDistanceText,
+    tripTollText,
+    dayTollText,
+    tripDurationText,
+    dayDurationText,
     filterContext,
     summary,
   } = workspace
+
+  const canOpenCompactPhotos = activeWorkspace === 'review' && Boolean(activeSegment)
+
+  useEffect(() => {
+    if (compactPanelTab === 'photos' && !canOpenCompactPhotos) {
+      setCompactPanelTab('details')
+    }
+    if (detailPanelTab === 'photos' && !canOpenCompactPhotos) {
+      setDetailPanelTab('details')
+    }
+  }, [canOpenCompactPhotos, compactPanelTab, detailPanelTab])
+
+  const changeFiltersWithDetailGuard = useCallback((nextFilters: typeof filters) => {
+    const selectionChanged = nextFilters.tripId !== filters.tripId
+      || nextFilters.dayId !== filters.dayId
+      || nextFilters.segmentId !== filters.segmentId
+    if (selectionChanged && detailDraftState.dirty) {
+      const confirmed = window.confirm('当前轨迹详情有未保存的更改。确定放弃更改并切换吗？')
+      if (!confirmed) return
+      setDetailDraftState({ segmentId: null, dirty: false })
+    }
+    setFilters(nextFilters)
+  }, [detailDraftState.dirty, filters, setFilters])
+
+  const changeWorkspaceWithDetailGuard = useCallback((workspaceName: typeof activeWorkspace) => {
+    if (workspaceName === activeWorkspace) return
+    if (detailDraftState.dirty) {
+      const confirmed = window.confirm('当前轨迹详情有未保存的更改。确定放弃更改并切换工作区吗？')
+      if (!confirmed) return
+      setDetailDraftState({ segmentId: null, dirty: false })
+    }
+    setActiveWorkspace(workspaceName)
+  }, [activeWorkspace, detailDraftState.dirty, setActiveWorkspace])
 
   useRouteCacheHydration({ trips: tripReview.trips, setTripReview, enabled: !isReadonlyDemoMode })
 
@@ -98,6 +202,8 @@ function App() {
     setTripReview,
     tripReview,
     activeSegmentId,
+    onDeleteLinkedPhotos: deleteLinkedPhotos,
+    onDeleteTripPhotoData: deleteTripPhotoData,
   })
 
   const segmentEditing = useSegmentEditing({
@@ -150,6 +256,72 @@ function App() {
 
   const routePreferenceValue = activeSegment?.preference ?? 'HIGHWAY_FIRST'
   const routeModeValue = activeSegment?.routeType ?? 'DRIVING'
+  const [routeRefreshRequest, setRouteRefreshRequest] = useState<{ segmentId: string | null; revision: number }>({
+    segmentId: null,
+    revision: 0,
+  })
+  const [isRouteLoading, setIsRouteLoading] = useState(false)
+  const [activeSegmentPhotos, setActiveSegmentPhotos] = useState<LinkedPhotoRecord[]>([])
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
+  const [photoPositionEdit, setPhotoPositionEdit] = useState<PhotoPositionEditState | null>(null)
+  const [isSavingPhotoPosition, setIsSavingPhotoPosition] = useState(false)
+  const [photoPositionError, setPhotoPositionError] = useState('')
+  const [photoDataRevision, setPhotoDataRevision] = useState(0)
+  const clearSelectedPhoto = useCallback(() => setSelectedPhotoId(null), [])
+  const selectPhotoAndOpenGallery = useCallback((photoId: string) => {
+    setSelectedPhotoId(photoId)
+    setDetailPanelTab('photos')
+    setCompactPanelTab('photos')
+  }, [])
+
+  const startPhotoPositionEdit = useCallback((photo: LinkedPhotoRecord) => {
+    setEditingSegmentId(null)
+    setPhotoPositionError('')
+    setPhotoPositionEdit({
+      photoId: photo.id,
+      originalFilename: photo.originalFilename,
+      draft: photo.mapPosition ? { lat: photo.mapPosition.lat, lon: photo.mapPosition.lon } : null,
+    })
+  }, [setEditingSegmentId])
+
+  const cancelPhotoPositionEdit = useCallback(() => {
+    setPhotoPositionEdit(null)
+    setPhotoPositionError('')
+  }, [])
+
+  const savePhotoPosition = useCallback(async () => {
+    if (!photoPositionEdit?.draft) return
+    const photo = activeSegmentPhotos.find((item) => item.id === photoPositionEdit.photoId)
+    if (!photo) {
+      setPhotoPositionError('照片记录不存在，请重新打开当前路段相册。')
+      return
+    }
+    const updatedPhoto: LinkedPhotoRecord = {
+      ...photo,
+      mapPosition: createManualMapPosition(photoPositionEdit.draft),
+      updatedAt: new Date().toISOString(),
+    }
+    setIsSavingPhotoPosition(true)
+    setPhotoPositionError('')
+    try {
+      await electronPhotoMetadataRepository.savePhoto(updatedPhoto)
+      setActiveSegmentPhotos((current) => current.map((item) => item.id === updatedPhoto.id ? updatedPhoto : item))
+      setPhotoDataRevision((value) => value + 1)
+      setPhotoPositionEdit(null)
+      setSelectedPhotoId(updatedPhoto.id)
+    } catch (error) {
+      setPhotoPositionError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setIsSavingPhotoPosition(false)
+    }
+  }, [activeSegmentPhotos, photoPositionEdit])
+
+  useEffect(() => {
+    setActiveSegmentPhotos([])
+    setSelectedPhotoId(null)
+    setPhotoPositionEdit(null)
+    setPhotoPositionError('')
+  }, [activeSegmentId, activeWorkspace])
 
   if (isReadonlyDemoMode && isLoading) {
     return (
@@ -185,15 +357,77 @@ function App() {
         <div className="top-nav-title-group">
             <h1>自驾旅行记录与规划工具</h1>
           <p>{filterContext.tripName} · {filterContext.dayDate} · {filterContext.segmentName}</p>
-          {isReadonlyDemoMode && <p className="readonly-banner">演示版 / 只读模式：当前内容不可修改</p>}
-          {!isReadonlyDemoMode && !amapKeyConfig.isChecking && !amapKeyConfig.configured && (
-            <p className="amap-key-warning">
+          {isReadonlyDemoMode ? (
+            <p className="top-nav-notice readonly-banner">演示版 / 只读模式：当前内容不可修改</p>
+          ) : storageIssue ? (
+            <div className="top-nav-notice trip-storage-warning" role="alert" aria-live="assertive">
+              <span>{storageIssue.message}</span>
+              <span className="trip-storage-warning-actions">
+                {storageIssue.kind === 'corrupt-data' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!downloadTripRecoveryCopy()) {
+                          window.alert('恢复原文导出失败，请检查浏览器下载权限。')
+                        }
+                      }}
+                    >
+                      导出恢复原文
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canResetCorruptTripStorage}
+                      title={canResetCorruptTripStorage ? undefined : '请先成功导出恢复原文'}
+                      onClick={() => {
+                        const confirmed = window.confirm(
+                          '这会用示例数据替换当前损坏的本地行程数据。恢复副本或已导出的原文会继续保留，是否继续？',
+                        )
+                        if (confirmed) resetCorruptTripStorage()
+                      }}
+                    >
+                      使用示例数据重置
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={retryTripPersistence}>重试保存</button>
+                )}
+              </span>
+            </div>
+          ) : photoCleanupFailures.length > 0 ? (
+            <p className="top-nav-notice photo-cleanup-warning">
+              有 {photoCleanupFailures.length} 张照片索引清理失败。
+              <button type="button" onClick={() => void runPhotoCleanup(photoCleanupFailures)}>重新清理</button>
+            </p>
+          ) : backupMessage ? (
+            <p className="top-nav-notice backup-export-status" aria-live="polite">{backupMessage}</p>
+          ) : !amapKeyConfig.isChecking && !amapKeyConfig.configured ? (
+            <p className="top-nav-notice amap-key-warning">
               {amapKeyConfig.error || '地图服务尚未配置，地点联想和路线规划暂不可用。'}
             </p>
-          )}
-          {backupMessage && <p className="backup-export-status">{backupMessage}</p>}
+          ) : null}
         </div>
-        <div className="top-nav-actions">
+        <nav className="workspace-tabs top-nav-primary" role="tablist" aria-label="工作模式">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeWorkspace === 'review'}
+            className={activeWorkspace === 'review' ? 'active' : ''}
+            onClick={() => changeWorkspaceWithDetailGuard('review')}
+          >
+            复盘
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeWorkspace === 'plan'}
+            className={activeWorkspace === 'plan' ? 'active' : ''}
+            onClick={() => changeWorkspaceWithDetailGuard('plan')}
+          >
+            规划
+          </button>
+        </nav>
+        <div className="top-nav-tools">
           <input
             ref={backupImportInputRef}
             type="file"
@@ -206,6 +440,9 @@ function App() {
               if (file) void importBackup(file)
             }}
           />
+          <details className="top-nav-menu backup-menu">
+            <summary>备份</summary>
+            <div className="top-nav-menu-panel">
           <button
             type="button"
             className="backup-import-button"
@@ -217,6 +454,19 @@ function App() {
           <button type="button" className="backup-export-button" onClick={exportBackup} disabled={isExportingBackup}>
             {isExportingBackup ? '导出中...' : '导出备份'}
           </button>
+          <details className="backup-menu-help">
+            <summary>备份包含什么？</summary>
+            <div>
+              <strong>完整 ZIP 包含</strong>
+              <span>行程数据（含预计行驶时间和预估过路费）、路线缓存、照片索引、照片备注、地图位置和缩略图。</span>
+              <strong>完整 ZIP 不包含</strong>
+              <span>本地原图文件。原图仍保留在你选择的照片库目录中，恢复后目录移动过时需要重新关联。</span>
+              <strong>旧版 JSON</strong>
+              <span>只包含行程和路线缓存，不包含照片索引或缩略图。</span>
+            </div>
+          </details>
+            </div>
+          </details>
           {!isReadonlyDemoMode && (
             <button
               type="button"
@@ -231,33 +481,63 @@ function App() {
                   : '配置地图服务'}
             </button>
           )}
-          <div className="workspace-tabs" role="tablist" aria-label="总分类">
-            <button
-              type="button"
-              className={activeWorkspace === 'review' ? 'active' : ''}
-              onClick={() => setActiveWorkspace('review')}
-            >
-              复盘
-            </button>
-            <button
-              type="button"
-              className={activeWorkspace === 'plan' ? 'active' : ''}
-              onClick={() => setActiveWorkspace('plan')}
-            >
-              规划
-            </button>
-          </div>
         </div>
       </header>
 
       <div className="workspace-layout">
-        <aside className="sidebar-column">
+        <div className="compact-panel-tabs" role="tablist" aria-label="工作面板">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={compactPanelTab === 'editor'}
+            aria-controls="compact-editor-panel"
+            className={compactPanelTab === 'editor' ? 'active' : ''}
+            onClick={() => setCompactPanelTab('editor')}
+          >
+            旅程编辑
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={compactPanelTab === 'details'}
+            aria-controls="compact-detail-panel"
+            className={compactPanelTab === 'details' ? 'active' : ''}
+            onClick={() => {
+              setCompactPanelTab('details')
+              setDetailPanelTab('details')
+            }}
+          >
+            路段详情
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={compactPanelTab === 'photos'}
+            aria-controls="compact-photo-panel"
+            className={compactPanelTab === 'photos' ? 'active' : ''}
+            onClick={() => {
+              setCompactPanelTab('photos')
+              setDetailPanelTab('photos')
+            }}
+            disabled={!canOpenCompactPhotos}
+          >
+            相册（{activeSegmentPhotos.length}）
+          </button>
+        </div>
+
+        <aside
+          id="compact-editor-panel"
+          className="sidebar-column compact-work-panel"
+          data-compact-active={compactPanelTab === 'editor'}
+        >
           {!tripManagerOpen ? (
             <TripEditor
               trips={workspaceTrips}
               onAddTrip={tripManager.addTrip}
               onAddSegment={tripManager.addSegment}
               isReadonlyMode={isReadonlyDemoMode}
+              selectedTripId={filters.tripId}
+              selectedDayDate={selectedDay?.date ?? ''}
             />
           ) : (
             <TripManageModal
@@ -290,8 +570,24 @@ function App() {
                 setEditingSegmentId(null)
               }}
               selectedWaypoint={segmentEditing.selectedWaypoint}
+              photos={activeWorkspace === 'review' && activeSegmentId ? activeSegmentPhotos : []}
+              selectedPhotoId={selectedPhotoId}
+              onSelectPhoto={selectPhotoAndOpenGallery}
+              photoPositionEditId={photoPositionEdit?.photoId ?? null}
+              photoPositionEditFilename={photoPositionEdit?.originalFilename ?? ''}
+              photoPositionDraft={photoPositionEdit?.draft ?? null}
+              isSavingPhotoPosition={isSavingPhotoPosition}
+              photoPositionError={photoPositionError}
+              onPhotoPositionDraftChange={(coordinate) => {
+                setPhotoPositionError('')
+                setPhotoPositionEdit((current) => current ? { ...current, draft: coordinate } : current)
+              }}
+              onSavePhotoPosition={() => void savePhotoPosition()}
+              onCancelPhotoPosition={cancelPhotoPositionEdit}
               onRouteResolved={saveResolvedRoutes}
               routeServiceRevision={amapKeyConfig.serviceRevision}
+              routeRefreshRequest={routeRefreshRequest}
+              onRouteLoadingChange={setIsRouteLoading}
               allowAutoBuild={Boolean(!isReadonlyDemoMode && filters.tripId && filters.dayId && filters.segmentId && mapRenderSegments.length <= 3)}
               isReadonlyMode={isReadonlyDemoMode}
               onEndpointDraftChange={editing.updateEndpointCoords}
@@ -301,7 +597,7 @@ function App() {
           <FilterPanel
             trips={workspaceTrips}
             filters={filters}
-            onChange={setFilters}
+            onChange={changeFiltersWithDetailGuard}
             routeColorMode={routeColorMode}
             onChangeRouteColorMode={setRouteColorMode}
             canUseScoreColoring={canUseScoreColoring}
@@ -312,26 +608,60 @@ function App() {
             isReadonlyMode={isReadonlyDemoMode}
             tripDistanceText={tripDistanceText}
             dayDistanceText={dayDistanceText}
+            tripTollText={tripTollText}
+            dayTollText={dayTollText}
+            tripDurationText={tripDurationText}
+            dayDurationText={dayDurationText}
           />
         </section>
 
-        <aside className="detail-column">
-          <MapPlaceholder
+        <aside
+          className="detail-column compact-work-panel"
+          data-compact-active={compactPanelTab !== 'editor'}
+        >
+          <div className="detail-panel-tabs" role="tablist" aria-label="路段侧栏">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={detailPanelTab === 'details'}
+              aria-controls="compact-detail-panel"
+              className={detailPanelTab === 'details' ? 'active' : ''}
+              onClick={() => setDetailPanelTab('details')}
+            >
+              路段信息
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={detailPanelTab === 'photos'}
+              aria-controls="compact-photo-panel"
+              className={detailPanelTab === 'photos' ? 'active' : ''}
+              onClick={() => setDetailPanelTab('photos')}
+              disabled={!canOpenCompactPhotos}
+            >
+              相册（{activeSegmentPhotos.length}）
+            </button>
+          </div>
+          <div
+            id="compact-detail-panel"
+            className="compact-detail-pane detail-content-pane"
+            data-compact-active={compactPanelTab === 'details'}
+            data-detail-active={detailPanelTab === 'details'}
+          >
+            <MapPlaceholder
             placeholderMode={placeholderMode}
             tripListItems={tripListItems}
-            onViewTrip={(tripId) => setFilters({ tripId, dayId: '', segmentId: '' })}
+            onViewTrip={(tripId) => changeFiltersWithDetailGuard({ tripId, dayId: '', segmentId: '' })}
             onOpenTripManager={() => setTripManagerOpen(true)}
             onDeleteTrip={tripManager.deleteTrip}
             isReadonlyMode={isReadonlyDemoMode}
             filteredSegments={detailSegments}
             summary={summary}
             filterContext={filterContext}
-            editingSegmentId={editingSegmentId}
             activeSegmentId={activeSegmentId}
             activeSegment={activeSegment}
             activeSegmentDate={segmentEditing.activeSegmentDate}
             segmentMetaDraft={segmentMetaDraft}
-            onEditSegment={(segmentId) => setEditingSegmentId(segmentId)}
             onDeleteSegment={tripManager.deleteSegment}
             onStartSegmentMetaEdit={segmentEditing.startSegmentMetaEdit}
             onCancelSegmentMetaEdit={() => setSegmentMetaDraft(null)}
@@ -354,7 +684,6 @@ function App() {
             canMoveSegmentDown={tripManager.canMoveSegment(activeSegmentId, 'down')}
             waypoints={editingWaypointSegmentId === activeSegmentId ? waypointDrafts : segmentEditing.displayedWaypoints}
             onLocateWaypoint={(waypoint) => setSelectedWaypointId(waypoint.id)}
-            waypointEditMode={editingWaypointSegmentId === activeSegmentId}
             onStartWaypointEdit={() => {
               if (activeSegmentId) segmentEditing.startWaypointEdit(activeSegmentId)
             }}
@@ -365,7 +694,6 @@ function App() {
             onSelectWaypointPlace={editing.selectWaypointPlace}
             onMoveWaypoint={editing.moveWaypoint}
             onDeleteWaypoint={editing.deleteWaypoint}
-            endpointEditMode={editingEndpointsSegmentId === activeSegmentId}
             endpointDraft={segmentEditing.effectiveEndpointDraft}
             onStartEndpointEdit={() => {
               if (activeSegmentId) segmentEditing.startEndpointsEdit(activeSegmentId)
@@ -388,11 +716,45 @@ function App() {
                 note: normalizeSegmentNote(value),
               }))
             }}
+            onDetailDraftStateChange={setDetailDraftState}
+            onRefreshRouteEstimate={() => {
+              if (!activeSegmentId) return
+              setRouteRefreshRequest((current) => ({
+                segmentId: activeSegmentId,
+                revision: current.revision + 1,
+              }))
+            }}
+            isRouteEstimateRefreshing={Boolean(
+              isRouteLoading && activeSegmentId && routeRefreshRequest.segmentId === activeSegmentId
+            )}
           />
+          </div>
+          <div
+            id="compact-photo-panel"
+            className="compact-photo-pane detail-content-pane"
+            data-compact-active={compactPanelTab === 'photos'}
+            data-detail-active={detailPanelTab === 'photos'}
+          >
+            {activeWorkspace === 'review' && activeSegment && (
+              <SegmentPhotoGallery
+              tripId={filters.tripId}
+              segment={activeSegment}
+              tripReview={tripReview}
+              setTripReview={setTripReview}
+              isReadonlyMode={isReadonlyDemoMode}
+              selectedPhotoId={selectedPhotoId}
+              onSelectPhoto={selectPhotoAndOpenGallery}
+              onClearSelectedPhoto={clearSelectedPhoto}
+              onPhotosChange={setActiveSegmentPhotos}
+              externalRevision={photoDataRevision}
+              onStartPhotoPosition={startPhotoPositionEdit}
+              />
+            )}
+          </div>
         </aside>
       </div>
 
-      <footer className="app-mode-footer">当前模式：{appMode === 'readonly-demo' ? 'readonly-demo（演示只读）' : 'normal（正常可编辑）'}</footer>
+      {appMode === 'readonly-demo' && <footer className="app-mode-footer">演示只读模式</footer>}
 
       <AmapKeySetupDialog
         open={amapKeyConfig.isOpen}

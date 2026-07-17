@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import L, { type LatLngExpression } from 'leaflet'
-import { useMap } from 'react-leaflet'
+import { useMap, useMapEvents } from 'react-leaflet'
+import type { PhotoCoordinate } from '../../types/photo'
 import type { Waypoint } from '../../types/trip'
+import type { LinkedPhotoRecord } from '../../types/photo'
 
 export function ViewportController({ points }: { points: LatLngExpression[] }) {
   const map = useMap()
@@ -56,5 +58,36 @@ export function WaypointFocusController({ waypoint }: { waypoint: Waypoint | nul
     map.flyTo([waypoint.lat, waypoint.lng], Math.max(map.getZoom(), 12), { duration: 0.8 })
   }, [map, waypoint])
 
+  return null
+}
+
+export function PhotoFocusController({ photo }: { photo: LinkedPhotoRecord | null }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!photo?.mapPosition) return
+    map.flyTo(
+      [photo.mapPosition.lat, photo.mapPosition.lon],
+      Math.max(map.getZoom(), 14),
+      { duration: 0.8 },
+    )
+  }, [map, photo])
+
+  return null
+}
+
+export function PhotoPositionPickController({
+  active,
+  onPick,
+}: {
+  active: boolean
+  onPick: (coordinate: PhotoCoordinate) => void
+}) {
+  useMapEvents({
+    click: (event: any) => {
+      if (!active) return
+      onPick({ lat: event.latlng.lat, lon: event.latlng.lng })
+    },
+  })
   return null
 }

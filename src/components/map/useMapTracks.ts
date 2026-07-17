@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { planCyclingRoute, planDrivingRoute, searchAmapInputTips } from '../../services/amap'
 import { saveSegmentRouteCache } from '../../services/routeCacheDb'
-import type { RouteSegment, Waypoint } from '../../types/trip'
+import type { RouteSegment } from '../../types/trip'
 import { buildSegmentRouteKey } from '../../utils/routeBuildKey'
+import { hasCurrentDurationEstimate } from '../../utils/durations'
+import { hasCurrentTollEstimate } from '../../utils/tolls'
+import { getUnresolvedNamedWaypoints, hasResolvedWaypointCoordinate } from '../../utils/waypointValidation'
 import { fallbackLineFromPoints } from './trackUtils'
-import type { PointKind, ResolvedRoutePatch, SegmentRouteDescriptor, SegmentTrack } from './types'
+import type { PointKind, ResolvedRoutePatch, RouteRefreshRequest, SegmentRouteDescriptor, SegmentTrack } from './types'
 
 interface UseMapTracksParams {
   filteredSegments: RouteSegment[]
@@ -12,6 +15,7 @@ interface UseMapTracksParams {
   isReadonlyMode: boolean
   onRouteResolved: (patches: ResolvedRoutePatch[]) => void
   routeServiceRevision: number
+  routeRefreshRequest: RouteRefreshRequest
 }
 
 async function resolvePointByName(placeName: string): Promise<{ lat: number; lon: number } | null> {
@@ -27,11 +31,13 @@ export function useMapTracks({
   isReadonlyMode,
   onRouteResolved,
   routeServiceRevision,
+  routeRefreshRequest,
 }: UseMapTracksParams) {
   const [tracks, setTracks] = useState<SegmentTrack[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('请选择旅程/日期/路段以查看轨迹')
   const buildRunIdRef = useRef(0)
+  const handledRefreshRevisionRef = useRef(0)
 
   const segmentDescriptors = useMemo<SegmentRouteDescriptor[]>(
     () =>
@@ -65,6 +71,10 @@ export function useMapTracks({
       }
 
       const shouldPlanMissing = allowAutoBuild && !isReadonlyMode
+      const pendingRefresh = routeRefreshRequest.revision > handledRefreshRevisionRef.current
+        ? routeRefreshRequest
+        : null
+      if (pendingRefresh) handledRefreshRevisionRef.current = pendingRefresh.revision
       setLoading(shouldPlanMissing)
       setMessage(shouldPlanMissing ? '正在按需加载路线...' : '当前为全局视图，仅展示已缓存轨迹。')
 
@@ -79,10 +89,15 @@ export function useMapTracks({
           let startCoord = segment.startCoord
           let endCoord = segment.endCoord
 
-          const resolvedWaypoints = (segment.waypoints ?? []).filter(
-            (point): point is Waypoint & { lat: number; lng: number } =>
-              typeof point.lat === 'number' && typeof point.lng === 'number',
-          )
+          const resolvedWaypoints = (segment.waypoints ?? []).filter(hasResolvedWaypointCoordinate)
+          const unresolvedWaypoints = getUnresolvedNamedWaypoints(segment.waypoints)
+          if (unresolvedWaypoints.length > 0) {
+            const names = unresolvedWaypoints.map((waypoint) => waypoint.name.trim()).join('、')
+            warnings.push(
+              `路段“${segment.name}”有 ${unresolvedWaypoints.length} 个途经点尚未解析坐标（${names}），已停止路线计算。`,
+            )
+            return
+          }
 
           const markerPoints: Array<{ name: string; lat: number; lon: number; type: PointKind }> = []
           if (startCoord) markerPoints.push({ name: startName, lat: startCoord.lat, lon: startCoord.lon, type: 'start' })
@@ -91,7 +106,12 @@ export function useMapTracks({
           }
           if (endCoord) markerPoints.push({ name: endName, lat: endCoord.lat, lon: endCoord.lon, type: 'end' })
 
-          if (canReusePersisted && segment.points) {
+          const routeType = segment.routeType ?? 'DRIVING'
+          const forceRefresh = pendingRefresh?.segmentId === segment.id
+          const needsTollEstimate = routeType === 'DRIVING' && !hasCurrentTollEstimate(segment)
+          const needsDurationEstimate = !hasCurrentDurationEstimate(segment)
+
+          if (canReusePersisted && segment.points && !needsTollEstimate && !needsDurationEstimate && !forceRefresh) {
             partialTracks[index] = {
               segmentId: segment.id,
               segmentName: segment.name,
@@ -102,6 +122,16 @@ export function useMapTracks({
           }
 
           if (!shouldPlanMissing) {
+            if (segment.points?.length) {
+              partialTracks[index] = {
+                segmentId: segment.id,
+                segmentName: segment.name,
+                points: markerPoints,
+                line: segment.points,
+              }
+              if (!canReusePersisted) warnings.push(`路段「${segment.name}」的缓存轨迹待更新。`)
+              return
+            }
             warnings.push(`路段「${segment.name}」暂无缓存轨迹。`)
             return
           }
@@ -125,11 +155,10 @@ export function useMapTracks({
             return
           }
 
-          const routeType = segment.routeType ?? 'DRIVING'
           const { route, error } =
             routeType === 'CYCLING'
-              ? await planCyclingRoute(planningPoints)
-              : await planDrivingRoute(planningPoints, segment.preference)
+              ? await planCyclingRoute(planningPoints, { forceRefresh })
+              : await planDrivingRoute(planningPoints, segment.preference, { forceRefresh })
 
           if (!active || runId !== buildRunIdRef.current) return
 
@@ -140,6 +169,18 @@ export function useMapTracks({
               segmentId: segment.id,
               points: line,
               distanceMeters: typeof route.distanceMeters === 'number' ? route.distanceMeters : null,
+              estimatedDurationSeconds:
+                typeof route.durationSeconds === 'number' ? route.durationSeconds : null,
+              durationUpdatedAt: route.durationUpdatedAt,
+              estimatedTollYuan:
+                routeType === 'DRIVING' && typeof route.estimatedTollYuan === 'number'
+                  ? route.estimatedTollYuan
+                  : null,
+              tollDistanceMeters:
+                routeType === 'DRIVING' && typeof route.tollDistanceMeters === 'number'
+                  ? route.tollDistanceMeters
+                  : null,
+              tollUpdatedAt: routeType === 'DRIVING' ? route.tollUpdatedAt : undefined,
               routeBuildKey: buildKey,
             })
             void saveSegmentRouteCache({
@@ -203,6 +244,7 @@ export function useMapTracks({
     isReadonlyMode,
     onRouteResolved,
     routeServiceRevision,
+    routeRefreshRequest,
   ])
 
   return { tracks, loading, message }

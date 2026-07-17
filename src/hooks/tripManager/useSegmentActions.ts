@@ -12,12 +12,13 @@ import { sortTripDaysByDate } from '../../utils/date'
 import { normalizeScore, normalizeSegmentNote } from '../../utils/segmentScores'
 import type {
   BlockReadonlyWrite,
+  DeleteLinkedPhotos,
   EditingStateControls,
   FindSegmentRef,
   SetFilters,
   SetTripReview,
 } from './types'
-import { createId, getPreviousSegmentSelection } from './utils'
+import { createId, getSavedSegmentSelection } from './utils'
 
 interface UseSegmentActionsParams extends EditingStateControls {
   activeSegmentId: string | null
@@ -27,6 +28,7 @@ interface UseSegmentActionsParams extends EditingStateControls {
   setTripReview: SetTripReview
   blockReadonlyWrite: BlockReadonlyWrite
   findSegmentRef: FindSegmentRef
+  onDeleteLinkedPhotos: DeleteLinkedPhotos
 }
 
 export function useSegmentActions({
@@ -46,6 +48,7 @@ export function useSegmentActions({
   setTripReview,
   blockReadonlyWrite,
   findSegmentRef,
+  onDeleteLinkedPhotos,
 }: UseSegmentActionsParams) {
   const getSegmentDate = useCallback((segmentId: string | null): string => {
     if (!segmentId) return ''
@@ -68,8 +71,8 @@ export function useSegmentActions({
   const updateSegmentMeta = useCallback((segmentId: string, patch: { name: string; date: string }) => {
     if (blockReadonlyWrite('updateSegmentMeta')) return
     const currentRef = findSegmentRef(segmentId)
-    const fallbackSelection = currentRef && patch.date && patch.date !== currentRef.day.date
-      ? getPreviousSegmentSelection(currentRef)
+    const savedSelection = currentRef
+      ? getSavedSegmentSelection(currentRef, patch.date || currentRef.day.date)
       : null
 
     setTripReview((prev) => {
@@ -130,10 +133,8 @@ export function useSegmentActions({
 
     setFilters((prev) => {
       if (prev.segmentId !== segmentId && activeSegmentId !== segmentId) return prev
-      if (fallbackSelection) {
-        return { ...prev, dayId: fallbackSelection.dayId, segmentId: fallbackSelection.segmentId }
-      }
-      return { ...prev, dayId: patch.date || prev.dayId }
+      if (!savedSelection) return prev
+      return { ...prev, dayId: savedSelection.dayId, segmentId: savedSelection.segmentId }
     })
   }, [activeSegmentId, blockReadonlyWrite, findSegmentRef, setFilters, setTripReview])
 
@@ -255,9 +256,12 @@ export function useSegmentActions({
 
     const fallbackSegment = listViewSegments[payload.index]
     const targetId = payload.segmentId ?? fallbackSegment?.id ?? null
+    const targetSegment = targetId ? findSegmentRef(targetId)?.segment ?? fallbackSegment : fallbackSegment
+    const deletedPhotoIds = targetSegment?.photoIds ?? []
     if (targetId) {
       void deleteSegmentRouteCache(targetId)
     }
+    if (deletedPhotoIds.length > 0) onDeleteLinkedPhotos(deletedPhotoIds)
 
     setTripReview((prev) => ({
       trips: prev.trips.map((trip) => ({
@@ -290,7 +294,7 @@ export function useSegmentActions({
       setEditingEndpointsSegmentId(null)
       setEndpointDraft(null)
     }
-  }, [blockReadonlyWrite, editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, listViewSegments, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setSelectedWaypointId, setTripReview, setWaypointDrafts])
+  }, [blockReadonlyWrite, editingEndpointsSegmentId, editingSegmentId, editingWaypointSegmentId, findSegmentRef, listViewSegments, onDeleteLinkedPhotos, setEditingEndpointsSegmentId, setEditingSegmentId, setEditingWaypointSegmentId, setEndpointDraft, setSelectedWaypointId, setTripReview, setWaypointDrafts])
 
   return {
     getSegmentDate,

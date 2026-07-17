@@ -10,6 +10,8 @@ interface PlaceSelectResult {
 }
 
 interface PlaceAutocompleteProps {
+  inputId?: string
+  inputLabel?: string
   valueText: string
   onValueTextChange: (text: string) => void
   onSelect: (result: PlaceSelectResult) => void
@@ -24,6 +26,8 @@ function isAdministrative(item: AMapPlaceSuggestion): boolean {
 }
 
 function PlaceAutocomplete({
+  inputId,
+  inputLabel,
   valueText,
   onValueTextChange,
   onSelect,
@@ -179,6 +183,8 @@ function PlaceAutocomplete({
     <div className="autocomplete-field">
       <div className="autocomplete-input-row">
         <input
+          id={inputId}
+          aria-label={inputLabel}
           value={valueText}
           onFocus={() => {
             setIsFocused(true)

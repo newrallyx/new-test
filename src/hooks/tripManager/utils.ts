@@ -20,14 +20,10 @@ export function createDuplicateTripTitle(title: string, existingTitles: Set<stri
   return `${baseTitle} ${copyIndex}`
 }
 
-export function getPreviousSegmentSelection(ref: SegmentRef): SegmentSelection | null {
-  const flatSegments = ref.trip.days.flatMap((day) =>
-    day.routeSegments.map((segment) => ({
-      dayId: day.id,
-      segmentId: segment.id,
-    })),
-  )
-  const currentIndex = flatSegments.findIndex((item) => item.segmentId === ref.segment.id)
-  if (currentIndex <= 0) return null
-  return flatSegments[currentIndex - 1]
+export function getSavedSegmentSelection(ref: SegmentRef, nextDate: string): SegmentSelection {
+  const targetDay = ref.trip.days.find((day) => day.date === nextDate)
+  return {
+    dayId: targetDay?.id ?? nextDate,
+    segmentId: ref.segment.id,
+  }
 }

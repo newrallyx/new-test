@@ -1,3 +1,4 @@
+import { LOCAL_API_CLIENT_HEADERS } from '../localApiClient.ts'
 import type { AMapPlaceSuggestion, AMapServiceError, AMapTip, InputTipsQuery } from './types'
 import { parseLocationText } from './utils'
 
@@ -140,7 +141,10 @@ async function requestInputTips(
   }
 
   try {
-    const response = await fetch(`${url.pathname}${url.search}`, { signal })
+    const response = await fetch(`${url.pathname}${url.search}`, {
+      headers: LOCAL_API_CLIENT_HEADERS,
+      signal,
+    })
     const payload = (await response.json()) as {
       ok?: boolean
       data?: Array<{

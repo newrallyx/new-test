@@ -14,4 +14,5 @@ declare module 'react-leaflet' {
   export const Polyline: ComponentType<any>
   export const TileLayer: ComponentType<any>
   export function useMap(): any
+  export function useMapEvents(handlers: Record<string, (event: any) => void>): any
 }

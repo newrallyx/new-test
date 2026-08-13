@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { alertDialog, confirmDialog, promptDialog } from './ConfirmDialog'
+import EmptyState from './EmptyState'
 import { useSegmentPhotoGallery } from '../hooks/useSegmentPhotoGallery'
 import type { RouteSegment, TripReview } from '../types/trip'
 import SegmentPhotoThumbnail from './SegmentPhotoThumbnail'
@@ -20,6 +22,7 @@ interface SegmentPhotoGalleryProps {
   onPhotosChange: (photos: LinkedPhotoRecord[]) => void
   externalRevision: number
   onStartPhotoPosition: (photo: LinkedPhotoRecord) => void
+  onSetCoverPhoto: (photoId: string | null) => Promise<void>
 }
 
 function SegmentPhotoGallery({
@@ -34,6 +37,7 @@ function SegmentPhotoGallery({
   onPhotosChange,
   externalRevision,
   onStartPhotoPosition,
+  onSetCoverPhoto,
 }: SegmentPhotoGalleryProps) {
   const gallery = useSegmentPhotoGallery({
     tripId,
@@ -132,7 +136,15 @@ function SegmentPhotoGallery({
   const runBulkAction = async (action: 'refresh' | 'restore-position' | 'clear-position' | 'move' | 'remove') => {
     const ids = Array.from(selectedPhotoIds)
     if (ids.length === 0) return
-    if (action === 'remove' && !window.confirm(`确定从当前路段移除选中的 ${ids.length} 张照片吗？本地原图不会删除。`)) return
+    if (action === 'remove') {
+      const confirmed = await confirmDialog({
+        title: '批量移除照片',
+        message: `确定从当前路段移除选中的 ${ids.length} 张照片吗？本地原图不会删除。`,
+        confirmText: '移除',
+        danger: true,
+      })
+      if (!confirmed) return
+    }
     try {
       if (action === 'clear-position') await gallery.clearPhotoPositions(ids)
       else if (action === 'move') {
@@ -149,12 +161,12 @@ function SegmentPhotoGallery({
             failureCount += 1
           }
         }
-        if (failureCount > 0) window.alert(`${failureCount} 张照片处理失败，请查看相册中的错误提示。`)
+        if (failureCount > 0) await alertDialog(`${failureCount} 张照片处理失败，请查看相册中的错误提示。`)
       }
       setSelectedPhotoIds(new Set())
       setSelectionMode(false)
     } catch (bulkError) {
-      window.alert(bulkError instanceof Error ? bulkError.message : String(bulkError))
+      await alertDialog(bulkError instanceof Error ? bulkError.message : String(bulkError))
     }
   }
 
@@ -224,13 +236,40 @@ function SegmentPhotoGallery({
               {!isReadonlyMode && (
                 <div>
                   <button type="button" className="btn-text" onClick={() => {
-                    const name = window.prompt('新的照片库名称', gallery.rootSummary?.root.name ?? '')
-                    if (name) void gallery.renameSelectedRoot(name).catch((error) => window.alert(error instanceof Error ? error.message : String(error)))
+                    void (async () => {
+                      const name = await promptDialog({
+                        title: '修改照片库名称',
+                        message: '输入新的照片库名称：',
+                        input: {
+                          label: '照片库名称',
+                          placeholder: '照片库名称',
+                          defaultValue: gallery.rootSummary?.root.name ?? '',
+                        },
+                      })
+                      if (name) {
+                        try {
+                          await gallery.renameSelectedRoot(name)
+                        } catch (error) {
+                          void alertDialog(error instanceof Error ? error.message : String(error))
+                        }
+                      }
+                    })()
                   }}>改名</button>
                   <button type="button" className="btn-danger" disabled={gallery.rootSummary.photoCount > 0} onClick={() => {
-                    if (window.confirm('只移除软件中的照片库登记，不会删除本地目录和原图。确定继续吗？')) {
-                      void gallery.deleteSelectedRoot().catch((error) => window.alert(error instanceof Error ? error.message : String(error)))
-                    }
+                    void (async () => {
+                      const confirmed = await confirmDialog({
+                        title: '移除照片库',
+                        message: '只移除软件中的照片库登记，不会删除本地目录和原图。确定继续吗？',
+                        confirmText: '移除',
+                        danger: true,
+                      })
+                      if (!confirmed) return
+                      try {
+                        await gallery.deleteSelectedRoot()
+                      } catch (error) {
+                        void alertDialog(error instanceof Error ? error.message : String(error))
+                      }
+                    })()
                   }}>移除照片库</button>
                 </div>
               )}
@@ -269,15 +308,24 @@ function SegmentPhotoGallery({
           )}
 
           <div className="photo-consistency-actions">
-            <button type="button" onClick={() => void gallery.runConsistencyAudit().catch((error) => window.alert(error instanceof Error ? error.message : String(error)))}>检查照片关联一致性</button>
+            <button type="button" onClick={() => {
+              void gallery.runConsistencyAudit().catch((error) => void alertDialog(error instanceof Error ? error.message : String(error)))
+            }}>检查照片关联一致性</button>
             {gallery.consistencyReport && (
               <span>{consistencyIssueCount === 0 ? '未发现关联问题' : `发现 ${consistencyIssueCount} 项关联问题`}</span>
             )}
             {consistencyIssueCount > 0 && !isReadonlyMode && (
               <button type="button" className="btn-danger" onClick={() => {
-                if (window.confirm('将移除无效/重复引用、清理孤立索引，并修正照片所属路段。是否继续？')) {
-                  void gallery.repairConsistency().catch((error) => window.alert(error instanceof Error ? error.message : String(error)))
-                }
+                void (async () => {
+                  const confirmed = await confirmDialog({
+                    title: '修复照片关联',
+                    message: '将移除无效/重复引用、清理孤立索引，并修正照片所属路段。是否继续？',
+                    confirmText: '开始修复',
+                    danger: true,
+                  })
+                  if (!confirmed) return
+                  await gallery.repairConsistency().catch((error) => void alertDialog(error instanceof Error ? error.message : String(error)))
+                })()
               }}>修复一致性</button>
             )}
           </div>
@@ -376,7 +424,9 @@ function SegmentPhotoGallery({
       )}
 
       {gallery.isLoading ? (
-        <p className="hint-text">正在读取相册…</p>
+        <div className="photo-grid-skeleton" aria-label="正在读取相册">
+          {Array.from({ length: 4 }).map((_, index) => <div key={index} className="photo-grid-skeleton-card"><div className="shimmer" /><span className="shimmer-line" /></div>)}
+        </div>
       ) : gallery.photos.length > 0 ? (
         <>
           <div className="photo-gallery-controls">
@@ -423,10 +473,20 @@ function SegmentPhotoGallery({
               />
             ))}
           </div>
-          {filteredPhotos.length === 0 && <p className="hint-text">没有符合当前筛选条件的照片。</p>}
+          {filteredPhotos.length === 0 && (
+            <EmptyState
+              icon="photo"
+              title="没有符合条件的照片"
+              description="调整搜索关键词或筛选条件后重试。"
+            />
+          )}
         </>
       ) : (
-        <p className="hint-text">当前路段还没有关联照片。</p>
+        <EmptyState
+          icon="photo"
+          title="当前路段还没有照片"
+          description="使用上方「添加照片」扫描并关联照片到当前路段。"
+        />
       )}
 
       {!gallery.isLoading && visiblePhotoCount < filteredPhotos.length && (
@@ -445,6 +505,8 @@ function SegmentPhotoGallery({
           selectedPhotoId={selectedPhotoId}
           isReadonlyMode={isReadonlyMode}
           isUpdating={gallery.updatingPhotoId === selectedPhotoId}
+          coverPhotoId={tripReview.trips.find((trip) => trip.id === tripId)?.coverPhotoId ?? null}
+          onSetCoverPhoto={onSetCoverPhoto}
           onSelect={onSelectPhoto}
           onClose={onClearSelectedPhoto}
           onSaveNote={gallery.updatePhotoNote}

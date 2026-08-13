@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { CoordPoint, RoutePreference, RouteType, Trip, Waypoint } from '../types/trip'
 import { routePreferenceOptions } from '../utils/routePreference'
 import { eachDayInRange } from '../utils/date'
+import { AppIcon } from './icons'
 import PlaceAutocomplete from './PlaceAutocomplete'
 import SegmentScoreFields from './SegmentScoreFields'
 
@@ -192,7 +193,8 @@ function TripEditor({
           onClick={toggleTripPanel}
           disabled={isReadonlyMode}
         >
-          ＋ 新增旅程
+          <AppIcon name="plus" className="icon-inline" />
+          新增旅程
         </button>
         <button
           type="button"
@@ -202,7 +204,8 @@ function TripEditor({
           onClick={toggleSegmentPanel}
           disabled={isReadonlyMode || trips.length === 0}
         >
-          ＋ 新增路段
+          <AppIcon name="route" className="icon-inline" />
+          新增路段
         </button>
       </div>
       {creationMessage && <p className="creation-success" role="status">{creationMessage}</p>}

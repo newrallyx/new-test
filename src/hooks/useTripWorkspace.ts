@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { isReadonlyDemoMode } from '../config/appMode'
 import type {
   FilterState,
   RouteColorMode,
   RouteSegment,
   RouteSummary,
+  Trip,
   TripCategory,
   TripReview,
 } from '../types/trip'
@@ -20,6 +21,29 @@ interface UseTripWorkspaceParams {
   resetEditingState: () => void
 }
 
+export interface TripBookItem {
+  id: string
+  title: string
+  startDate: string
+  endDate: string
+  dayCount: number
+  segmentCount: number
+  photoCount: number
+  tripDistanceText: string
+  tripDurationText: string
+  tripTollText: string
+}
+
+function countTripPhotoIds(trip: Trip): number {
+  const photoIds = new Set<string>()
+  for (const day of trip.days) {
+    for (const segment of day.routeSegments) {
+      for (const photoId of segment.photoIds ?? []) photoIds.add(photoId)
+    }
+  }
+  return photoIds.size
+}
+
 export function useTripWorkspace({
   trips,
   editingSegmentId,
@@ -29,6 +53,11 @@ export function useTripWorkspace({
   const [filters, setFilters] = useState<FilterState>({ tripId: '', dayId: '', segmentId: '' })
   const [tripManagerOpen, setTripManagerOpen] = useState(false)
   const [routeColorMode, setRouteColorMode] = useState<RouteColorMode>('default')
+  const filtersRef = useRef(filters)
+
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
 
   const workspaceTrips = useMemo(
     () =>
@@ -76,27 +105,44 @@ export function useTripWorkspace({
   }, [editingSegmentId, filters.segmentId, listViewSegments])
 
   useEffect(() => {
-    setFilters((prev) => {
-      const firstTrip = workspaceTrips[0]
-      if (!firstTrip) return { tripId: '', dayId: '', segmentId: '' }
-
-      if (isReadonlyDemoMode && !prev.tripId) {
-        return { tripId: '', dayId: '', segmentId: '' }
+    const currentFilters = filtersRef.current
+    const firstTrip = workspaceTrips[0]
+    if (!firstTrip) {
+      if (currentFilters.tripId || currentFilters.dayId || currentFilters.segmentId) {
+        setFilters({ tripId: '', dayId: '', segmentId: '' })
+        resetEditingState()
       }
+      return
+    }
 
-      const selectedTrip = workspaceTrips.find((trip) => trip.id === prev.tripId) ?? firstTrip
-      const selectedDay = selectedTrip.days.find((day) => day.id === prev.dayId) ?? selectedTrip.days[0]
-      const selectedSegment =
-        selectedDay?.routeSegments.find((segment) => segment.id === prev.segmentId) ?? selectedDay?.routeSegments[0]
-
-      return {
-        tripId: selectedTrip.id,
-        dayId: selectedDay?.id ?? '',
-        segmentId: selectedSegment?.id ?? '',
+    if (isReadonlyDemoMode && !currentFilters.tripId) {
+      if (currentFilters.dayId || currentFilters.segmentId) {
+        setFilters({ tripId: '', dayId: '', segmentId: '' })
+        resetEditingState()
       }
-    })
-    resetEditingState()
-  }, [activeWorkspace, workspaceTrips, resetEditingState])
+      return
+    }
+
+    const selectedTrip = workspaceTrips.find((trip) => trip.id === currentFilters.tripId) ?? firstTrip
+    const selectedDay = selectedTrip.days.find((day) => day.id === currentFilters.dayId) ?? selectedTrip.days[0]
+    const selectedSegment =
+      selectedDay?.routeSegments.find((segment) => segment.id === currentFilters.segmentId) ?? selectedDay?.routeSegments[0]
+
+    const nextFilters: FilterState = {
+      tripId: selectedTrip.id,
+      dayId: selectedDay?.id ?? '',
+      segmentId: selectedSegment?.id ?? '',
+    }
+
+    if (
+      nextFilters.tripId !== currentFilters.tripId
+      || nextFilters.dayId !== currentFilters.dayId
+      || nextFilters.segmentId !== currentFilters.segmentId
+    ) {
+      setFilters(nextFilters)
+      resetEditingState()
+    }
+  }, [activeWorkspace, workspaceTrips, isReadonlyDemoMode, resetEditingState, setFilters])
 
   useEffect(() => {
     if (canUseScoreColoring || routeColorMode === 'default') return
@@ -124,6 +170,23 @@ export function useTripWorkspace({
         startDate: trip.startDate,
         endDate: trip.endDate,
         segmentCount: trip.days.reduce((sum, day) => sum + day.routeSegments.length, 0),
+        tripDistanceText: formatDistance(getTripDistanceMeters(trip)),
+        tripDurationText: formatDurationSummary(summarizeEstimatedDurations(trip.days.flatMap((day) => day.routeSegments))),
+        tripTollText: formatTollSummary(summarizeEstimatedTolls(trip.days.flatMap((day) => day.routeSegments))),
+      })),
+    [workspaceTrips],
+  )
+
+  const tripBookItems = useMemo<TripBookItem[]>(
+    () =>
+      workspaceTrips.map((trip) => ({
+        id: trip.id,
+        title: trip.title,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        dayCount: trip.days.length,
+        segmentCount: trip.days.reduce((sum, day) => sum + day.routeSegments.length, 0),
+        photoCount: countTripPhotoIds(trip),
         tripDistanceText: formatDistance(getTripDistanceMeters(trip)),
         tripDurationText: formatDurationSummary(summarizeEstimatedDurations(trip.days.flatMap((day) => day.routeSegments))),
         tripTollText: formatTollSummary(summarizeEstimatedTolls(trip.days.flatMap((day) => day.routeSegments))),
@@ -198,6 +261,7 @@ export function useTripWorkspace({
     selectedDay,
     activeSegment,
     tripListItems,
+    tripBookItems,
     tripDistanceText,
     dayDistanceText,
     tripTollText,

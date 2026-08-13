@@ -69,11 +69,20 @@ export function createPhotoConsistencyRepair(data: TripReview, photos: LinkedPho
   const report = auditPhotoConsistency(data, photos)
   const photoById = new Map(photos.map((photo) => [photo.id, photo]))
   const preferredSegmentByPhoto = new Map<string, string>()
+  const preferredTripByPhoto = new Map<string, string>()
+  const tripIdBySegment = new Map<string, string>()
+  for (const trip of data.trips) {
+    for (const day of trip.days) {
+      for (const segment of day.routeSegments) tripIdBySegment.set(segment.id, trip.id)
+    }
+  }
   const { review } = collectReferences(data)
   for (const [photoId, segmentIds] of review) {
     const photo = photoById.get(photoId)
     if (!photo) continue
-    preferredSegmentByPhoto.set(photoId, segmentIds.includes(photo.segmentId) ? photo.segmentId : segmentIds[0])
+    const preferredSegment = segmentIds.includes(photo.segmentId) ? photo.segmentId : segmentIds[0]
+    preferredSegmentByPhoto.set(photoId, preferredSegment)
+    preferredTripByPhoto.set(photoId, tripIdBySegment.get(preferredSegment) ?? '')
   }
 
   const seen = new Set<string>()
@@ -81,6 +90,12 @@ export function createPhotoConsistencyRepair(data: TripReview, photos: LinkedPho
     ...data,
     trips: data.trips.map((trip) => ({
       ...trip,
+      // 封面照片不存在或已不属于本旅程时，自动回退到默认封面。
+      coverPhotoId: trip.coverPhotoId
+        ? (photoById.has(trip.coverPhotoId) && preferredTripByPhoto.get(trip.coverPhotoId) === trip.id
+            ? trip.coverPhotoId
+            : undefined)
+        : undefined,
       days: trip.days.map((day) => ({
         ...day,
         routeSegments: day.routeSegments.map((segment) => {

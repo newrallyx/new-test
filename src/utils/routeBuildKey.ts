@@ -44,3 +44,17 @@ export function canDisplaySegmentRouteCache(segment: RouteSegment, routeBuildKey
   return routeBuildKey === buildSegmentRouteKey(segment)
     || routeBuildKey === buildLegacySegmentRouteKey(segment)
 }
+
+/**
+ * Whether the segment holds recorded route geometry that still matches its
+ * current route-defining inputs (start/end/waypoints/preference/routeType,
+ * in either current or legacy build-key format). Recorded geometry is the
+ * user's original record and must never be replaced by an automatic re-plan,
+ * even when duration/toll estimates are missing — only an explicit user
+ * action may rebuild it.
+ */
+export function canReuseRecordedRoute(segment: RouteSegment): boolean {
+  if (!Array.isArray(segment.points) || segment.points.length < 2) return false
+  if (typeof segment.routeBuildKey !== 'string' || !segment.routeBuildKey) return false
+  return canDisplaySegmentRouteCache(segment, segment.routeBuildKey)
+}

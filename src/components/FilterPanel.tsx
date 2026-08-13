@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FilterState, RouteColorMode, Trip } from '../types/trip'
 import { sortTripDaysByDate } from '../utils/date'
 
@@ -13,6 +13,7 @@ interface FilterPanelProps {
   onDuplicateTrip: (tripId: string) => void
   onInsertDayAfter: (tripId: string, dayId: string) => void
   onDeleteDay: (tripId: string, dayId: string) => void
+  onReorderDaySegments: (tripId: string, dayId: string, orderedSegmentIds: string[]) => void
   isReadonlyMode: boolean
   dayDistanceText: string
   tripDistanceText: string
@@ -34,6 +35,7 @@ function FilterPanel({
   onDuplicateTrip,
   onInsertDayAfter,
   onDeleteDay,
+  onReorderDaySegments,
   isReadonlyMode,
   dayDistanceText,
   tripDistanceText,
@@ -42,16 +44,34 @@ function FilterPanel({
   dayDurationText,
   tripDurationText,
 }: FilterPanelProps) {
+  const [isSegmentOrderOpen, setIsSegmentOrderOpen] = useState(false)
+  const [draggingSegmentId, setDraggingSegmentId] = useState<string | null>(null)
   const selectedTrip = trips.find((trip) => trip.id === filters.tripId)
 
   const dayOptions = useMemo(() => {
     return sortTripDaysByDate(selectedTrip?.days ?? [])
   }, [selectedTrip])
 
-  const segmentOptions = useMemo(() => {
-    const selectedDay = dayOptions.find((day) => day.id === filters.dayId)
-    return selectedDay?.routeSegments ?? []
-  }, [dayOptions, filters.dayId])
+  const selectedDay = dayOptions.find((day) => day.id === filters.dayId)
+  const segmentOptions = selectedDay?.routeSegments ?? []
+
+  useEffect(() => {
+    setIsSegmentOrderOpen(false)
+    setDraggingSegmentId(null)
+  }, [filters.tripId, filters.dayId])
+
+  const moveSegmentToIndex = (segmentId: string, targetIndex: number) => {
+    if (!selectedTrip || !selectedDay || isReadonlyMode) return
+    const orderedSegmentIds = segmentOptions.map((segment) => segment.id)
+    const currentIndex = orderedSegmentIds.indexOf(segmentId)
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedSegmentIds.length || currentIndex === targetIndex) {
+      return
+    }
+
+    const [movedId] = orderedSegmentIds.splice(currentIndex, 1)
+    orderedSegmentIds.splice(targetIndex, 0, movedId)
+    onReorderDaySegments(selectedTrip.id, selectedDay.id, orderedSegmentIds)
+  }
 
   return (
     <section className="card-section filter-panel-card">
@@ -122,6 +142,16 @@ function FilterPanel({
               >
                 删除当天
               </button>
+              <button
+                type="button"
+                aria-expanded={isSegmentOrderOpen}
+                aria-controls="day-segment-order-panel"
+                onClick={() => setIsSegmentOrderOpen((current) => !current)}
+                disabled={isReadonlyMode || !filters.tripId || !filters.dayId || segmentOptions.length < 2}
+                title={segmentOptions.length < 2 ? '当天至少需要两条路段才能排序' : '调整当天全部路段的先后顺序'}
+              >
+                {isSegmentOrderOpen ? '收起路段排序' : '调整路段顺序'}
+              </button>
             </div>
           </div>
         </label>
@@ -142,6 +172,61 @@ function FilterPanel({
           </select>
         </label>
       </div>
+
+      {isSegmentOrderOpen && selectedTrip && selectedDay && (
+        <section id="day-segment-order-panel" className="day-segment-order-panel" aria-label={`${selectedDay.date} 路段排序`}>
+          <div className="day-segment-order-header">
+            <div>
+              <h3>{selectedDay.date} 路段顺序</h3>
+              <p>拖拽路段，或使用上移、下移按钮；保存会立即生效。</p>
+            </div>
+            <button type="button" onClick={() => setIsSegmentOrderOpen(false)}>
+              完成
+            </button>
+          </div>
+          <ol className="day-segment-order-list">
+            {segmentOptions.map((segment, index) => (
+              <li
+                key={segment.id}
+                className={draggingSegmentId === segment.id ? 'dragging' : ''}
+                draggable={!isReadonlyMode}
+                onDragStart={() => setDraggingSegmentId(segment.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => {
+                  if (!draggingSegmentId) return
+                  moveSegmentToIndex(draggingSegmentId, index)
+                  setDraggingSegmentId(null)
+                }}
+                onDragEnd={() => setDraggingSegmentId(null)}
+              >
+                <span className="day-segment-order-number">#{index + 1}</span>
+                <div className="day-segment-order-meta">
+                  <strong>{segment.name}</strong>
+                  <small>{segment.startPoint} → {segment.endPoint}</small>
+                </div>
+                <div className="day-segment-order-actions">
+                  <button
+                    type="button"
+                    aria-label={`上移路段“${segment.name}”`}
+                    onClick={() => moveSegmentToIndex(segment.id, index - 1)}
+                    disabled={isReadonlyMode || index === 0}
+                  >
+                    上移
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`下移路段“${segment.name}”`}
+                    onClick={() => moveSegmentToIndex(segment.id, index + 1)}
+                    disabled={isReadonlyMode || index === segmentOptions.length - 1}
+                  >
+                    下移
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {!filters.tripId && <p className="hint-text filter-hint">已选择“全部旅程”，可查看所有路段。</p>}
       {filters.tripId && !filters.dayId && <p className="hint-text filter-hint">当前为该旅程下“全部日期”。</p>}

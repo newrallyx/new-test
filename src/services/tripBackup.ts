@@ -3,7 +3,10 @@ import { getAllSegmentRouteCache, type RouteCacheRecord } from './routeCacheDb.t
 import { toPersistedTripReview } from './tripStorage.ts'
 
 const BACKUP_SCHEMA = 'roadtrip-retrospective-backup'
-const BACKUP_VERSION = 1
+// 版本 2：支持路段复盘事实（标签、实际里程/时间/过路费）。
+// 导入同时兼容 v1（旧备份的旅程自动得到空的复盘字段）。
+const BACKUP_VERSION = 2
+const BACKUP_SUPPORTED_VERSIONS = [1, 2]
 
 interface TripBackupPayload {
   schema: typeof BACKUP_SCHEMA
@@ -116,7 +119,7 @@ export function parseTripBackupJson(json: string): TripBackupImport {
   if (isTripReview(parsed)) {
     tripReviewSource = parsed
   } else if (isRecord(parsed)) {
-    if (parsed.schema !== BACKUP_SCHEMA || parsed.version !== BACKUP_VERSION) {
+    if (parsed.schema !== BACKUP_SCHEMA || !BACKUP_SUPPORTED_VERSIONS.includes(parsed.version as number)) {
       throw new Error('备份文件格式不匹配。')
     }
 
@@ -144,13 +147,15 @@ export function parseTripBackupJson(json: string): TripBackupImport {
   }
 }
 
-export async function createTripBackupExport(data: TripReview): Promise<TripBackupExport> {
-  const exportedAt = new Date()
+export function buildTripBackupPayload(
+  data: TripReview,
+  segmentRoutes: RouteCacheRecord[],
+  exportedAt: Date,
+): TripBackupPayload {
   const tripReview = toPersistedTripReview(data)
-  const segmentRoutes = await getAllSegmentRouteCache()
   const routeSegmentCount = countRouteSegments(tripReview)
 
-  const payload: TripBackupPayload = {
+  return {
     schema: BACKUP_SCHEMA,
     version: BACKUP_VERSION,
     exportedAt: exportedAt.toISOString(),
@@ -169,6 +174,13 @@ export async function createTripBackupExport(data: TripReview): Promise<TripBack
       segmentRoutes,
     },
   }
+}
+
+export async function createTripBackupExport(data: TripReview): Promise<TripBackupExport> {
+  const exportedAt = new Date()
+  const segmentRoutes = await getAllSegmentRouteCache()
+  const payload = buildTripBackupPayload(data, segmentRoutes, exportedAt)
+  const routeSegmentCount = payload.summary.routeSegmentCount
 
   return {
     json: JSON.stringify(payload, null, 2),

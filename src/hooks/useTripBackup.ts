@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { confirmDialog } from '../components/ConfirmDialog'
 import { isReadonlyDemoMode } from '../config/appMode'
 import { getAllSegmentRouteCacheStrict, replaceAllSegmentRouteCache } from '../services/routeCacheDb'
 import { createTripBackupExport, parseTripBackupJson } from '../services/tripBackup'
@@ -126,9 +127,12 @@ export function useTripBackup({
         const missingPhotoIds = collectReferencedPhotoIds(nextTripReview)
           .filter((photoId) => !availablePhotoIds.has(photoId))
         nextTripReview = removePhotoReferences(nextTripReview, missingPhotoIds)
-        const confirmed = window.confirm(
-          `确定恢复这个完整备份吗？将替换当前全部行程、路线缓存、照片索引和缩略图。\n\n备份包含 ${imported.tripCount} 个旅程、${result.photoCount ?? 0} 张照片索引；本地原图不会被复制或删除。`,
-        )
+        const confirmed = await confirmDialog({
+          title: '恢复完整备份',
+          message: `确定恢复这个完整备份吗？将替换当前全部行程、路线缓存、照片索引和缩略图。\n\n备份包含 ${imported.tripCount} 个旅程、${result.photoCount ?? 0} 张照片索引；本地原图不会被复制或删除。`,
+          confirmText: '恢复备份',
+          danger: true,
+        })
         if (!confirmed) {
           if (preparedImportToken) await desktopBackupApi.cancelImport(preparedImportToken)
           setBackupMessage('已取消导入备份。')

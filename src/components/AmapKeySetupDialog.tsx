@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import type { AmapKeySource } from '../services/amapKeyConfig'
 
 interface AmapKeySetupDialogProps {
@@ -28,6 +29,8 @@ function AmapKeySetupDialog({
 }: AmapKeySetupDialogProps) {
   const [keyDraft, setKeyDraft] = useState('')
   const [showKey, setShowKey] = useState(false)
+  const dialogRef = useRef<HTMLElement | null>(null)
+  useFocusTrap(dialogRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -46,6 +49,7 @@ function AmapKeySetupDialog({
   return (
     <div className="amap-key-dialog-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="amap-key-dialog"
         role="dialog"
         aria-modal="true"

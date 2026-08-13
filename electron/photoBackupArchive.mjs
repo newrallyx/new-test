@@ -36,7 +36,7 @@ function validateTripBackupJson(json) {
   const parsed = parseJson(Buffer.from(json), 'Trip backup')
   if (
     parsed?.schema !== 'roadtrip-retrospective-backup'
-    || parsed?.version !== 1
+    || (parsed?.version !== 1 && parsed?.version !== 2)
     || !Array.isArray(parsed?.data?.tripReview?.trips)
     || !Array.isArray(parsed?.data?.segmentRoutes)
   ) {
@@ -50,7 +50,7 @@ function validateImportableTripBackupJson(json) {
   if (Array.isArray(parsed?.trips)) return parsed
   if (
     parsed?.schema === 'roadtrip-retrospective-backup'
-    && parsed?.version === 1
+    && (parsed?.version === 1 || parsed?.version === 2)
     && Array.isArray(parsed?.data?.tripReview?.trips)
   ) {
     return parsed

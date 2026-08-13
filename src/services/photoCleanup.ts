@@ -23,6 +23,8 @@ export function removePhotoReferences(data: TripReview, photoIds: string[]): Tri
     ...data,
     trips: data.trips.map((trip) => ({
       ...trip,
+      // 封面照片被移除时自动退回默认封面。
+      coverPhotoId: trip.coverPhotoId && removedIds.has(trip.coverPhotoId) ? undefined : trip.coverPhotoId,
       days: trip.days.map((day) => ({
         ...day,
         routeSegments: day.routeSegments.map((segment) => {

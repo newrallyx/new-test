@@ -1,7 +1,9 @@
 import { useCallback } from 'react'
+import { alertDialog, confirmDialog } from '../../components/ConfirmDialog'
 import { deleteSegmentRouteCache, getSegmentRouteCache, saveSegmentRouteCache } from '../../services/routeCacheDb'
 import type { FilterState, Trip, TripCategory, TripReview } from '../../types/trip'
 import { normalizeTripOrders, sortTripsByOrder } from '../../utils/tripOrder'
+import { moveTripToReview } from '../../utils/tripLifecycle'
 import type {
   BlockReadonlyWrite,
   DeleteTripPhotoData,
@@ -71,16 +73,19 @@ export function useTripActions({
     })
   }, [activeWorkspace, blockReadonlyWrite, setTripReview])
 
-  const deleteTrip = useCallback((tripId: string) => {
+  const deleteTrip = useCallback(async (tripId: string) => {
     if (blockReadonlyWrite('deleteTrip')) return
     const target = workspaceTrips.find((trip) => trip.id === tripId)
     if (!target) return
 
     const deletedSegmentIds = new Set(target.days.flatMap((day) => day.routeSegments.map((segment) => segment.id)))
     const segmentCount = target.days.reduce((sum, day) => sum + day.routeSegments.length, 0)
-    const confirmed = window.confirm(
-      `确定删除旅程“${target.title}”吗？将同时删除该旅程下的全部日期与路段数据（${segmentCount} 条路段）。此操作不可恢复。`,
-    )
+    const confirmed = await confirmDialog({
+      title: '删除旅程',
+      message: `确定删除旅程“${target.title}”吗？将同时删除该旅程下的全部日期与路段数据（${segmentCount} 条路段）。此操作不可恢复。`,
+      confirmText: '删除',
+      danger: true,
+    })
     if (!confirmed) return
 
     void (async () => {
@@ -88,7 +93,7 @@ export function useTripActions({
         await onDeleteTripPhotoData(tripId, Array.from(deletedSegmentIds))
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        window.alert(`照片库清理失败，旅程尚未删除：${message}`)
+        await alertDialog(`照片库清理失败，旅程尚未删除：${message}`)
         return
       }
 
@@ -254,11 +259,28 @@ export function useTripActions({
     })
   }, [activeWorkspace, blockReadonlyWrite, setTripReview])
 
+  const completeTrip = useCallback(async (tripId: string): Promise<boolean> => {
+    if (blockReadonlyWrite('completeTrip')) return false
+    const target = workspaceTrips.find((trip) => trip.id === tripId)
+    if (!target || target.category !== 'plan') return false
+
+    const confirmed = await confirmDialog({
+      title: '完成旅程，转入复盘',
+      message: `确定把旅程“${target.title}”从规划转入复盘吗？旅程、路段、路线缓存和照片关联都会原样保留，之后在复盘中可直接补充照片、评分和实际情况。若有未保存的路段详情更改将被放弃。`,
+      confirmText: '转入复盘',
+    })
+    if (!confirmed) return false
+
+    setTripReview((prev) => moveTripToReview(prev, tripId))
+    return true
+  }, [blockReadonlyWrite, setTripReview, workspaceTrips])
+
   return {
     addTrip,
     deleteTrip,
     updateTrip,
     duplicateTrip,
+    completeTrip,
     moveTrip,
     reorderTrips,
   }

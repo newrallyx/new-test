@@ -5,6 +5,7 @@ import {
   buildLegacySegmentRouteKey,
   buildSegmentRouteKey,
   canDisplaySegmentRouteCache,
+  canReuseRecordedRoute,
 } from '../src/utils/routeBuildKey.ts'
 
 function createSegment(overrides = {}) {
@@ -45,4 +46,45 @@ test('legacy cache is rejected when a route-defining input changes', () => {
     ),
     false,
   )
+})
+
+test('recorded route is reusable with a matching current or legacy key', () => {
+  const base = createSegment({ points: [{ lat: 34.34, lon: 108.93 }, { lat: 34.35, lon: 107.2 }] })
+
+  assert.equal(canReuseRecordedRoute({ ...base, routeBuildKey: buildSegmentRouteKey(base) }), true)
+  assert.equal(canReuseRecordedRoute({ ...base, routeBuildKey: buildLegacySegmentRouteKey(base) }), true)
+})
+
+test('recorded route stays reusable when duration/toll estimates are missing', () => {
+  const base = createSegment({
+    points: [{ lat: 34.34, lon: 108.93 }, { lat: 34.35, lon: 107.2 }],
+    routeBuildKey: buildLegacySegmentRouteKey(createSegment()),
+    estimatedDurationSeconds: undefined,
+    estimatedTollYuan: undefined,
+  })
+
+  assert.equal(canReuseRecordedRoute(base), true)
+})
+
+test('recorded route is not reusable without geometry or a stored key', () => {
+  const withKey = createSegment({ routeBuildKey: buildSegmentRouteKey(createSegment()) })
+
+  assert.equal(canReuseRecordedRoute(withKey), false)
+  assert.equal(
+    canReuseRecordedRoute({ ...withKey, points: [{ lat: 34.34, lon: 108.93 }, { lat: 34.35, lon: 107.2 }] }),
+    true,
+  )
+  assert.equal(
+    canReuseRecordedRoute({ ...createSegment(), points: [{ lat: 34.34, lon: 108.93 }, { lat: 34.35, lon: 107.2 }] }),
+    false,
+  )
+})
+
+test('recorded route is not reusable after a route-defining input changes', () => {
+  const segment = createSegment({
+    points: [{ lat: 34.34, lon: 108.93 }, { lat: 34.35, lon: 107.2 }],
+    routeBuildKey: buildLegacySegmentRouteKey(createSegment()),
+  })
+
+  assert.equal(canReuseRecordedRoute({ ...segment, endPoint: '天水' }), false)
 })

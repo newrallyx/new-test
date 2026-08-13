@@ -58,3 +58,21 @@ test('removePhotoReferences removes missing ids and drops empty photo arrays', (
   assert.deepEqual(cleaned.trips[0].days[0].routeSegments[0].photoIds, ['keep'])
   assert.equal(cleaned.trips[0].days[0].routeSegments[1].photoIds, undefined)
 })
+
+test('removePhotoReferences clears the trip cover when the cover photo is removed', () => {
+  const data = {
+    trips: [{
+      id: 'review', category: 'review', title: 'Review', startDate: '', endDate: '',
+      coverPhotoId: 'cover-photo',
+      days: [{ id: 'day-1', date: '', routeSegments: [
+        { id: 'segment-1', name: '', date: '', startPoint: '', endPoint: '', photoIds: ['cover-photo', 'keep'] },
+      ] }],
+    }],
+  }
+  const cleaned = removePhotoReferences(data, ['cover-photo'])
+  assert.equal(cleaned.trips[0].coverPhotoId, undefined)
+  assert.deepEqual(cleaned.trips[0].days[0].routeSegments[0].photoIds, ['keep'])
+
+  const untouched = removePhotoReferences(data, ['other-photo'])
+  assert.equal(untouched.trips[0].coverPhotoId, 'cover-photo')
+})

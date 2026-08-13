@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import type { PhotoLibraryScanFile } from '../types/photo'
 import PhotoCandidateCard from './PhotoCandidateCard'
 
@@ -30,6 +31,8 @@ function PhotoCandidatePickerDialog({
   const [unlinkedOnly, setUnlinkedOnly] = useState(true)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const dialogRef = useRef<HTMLElement | null>(null)
+  useFocusTrap(dialogRef, true)
   const filteredFiles = useMemo(() => {
     const query = filenameSearch.trim().toLocaleLowerCase()
     const startTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY
@@ -88,7 +91,7 @@ function PhotoCandidatePickerDialog({
 
   return (
     <div className="photo-candidate-picker-backdrop" role="presentation">
-      <section className="photo-candidate-picker-dialog" role="dialog" aria-modal="true" aria-label="选择要关联的照片">
+      <section ref={dialogRef} className="photo-candidate-picker-dialog" role="dialog" aria-modal="true" aria-label="选择要关联的照片">
         <header className="photo-candidate-picker-header">
           <div>
             <h2>选择要关联的照片</h2>

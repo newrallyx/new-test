@@ -69,7 +69,15 @@ export interface DesktopPhotoLibraryApi {
   readPhoto(rootId: string, relativePath: string): Promise<DesktopPhotoReadResult>
 }
 
+export interface DesktopWindowControlApi {
+  minimize(): Promise<void>
+  maximizeToggle(): Promise<void>
+  close(): Promise<void>
+  onMaximizedChange(callback: (maximized: boolean) => void): () => void
+}
+
 export interface RoadtripDesktopApi {
+  windowControls: DesktopWindowControlApi
   backup: DesktopBackupApi
   photoLibrary: DesktopPhotoLibraryApi
 }

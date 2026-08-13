@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { confirmDialog } from './ConfirmDialog'
+import { AppIcon } from './icons'
+import { PhotoFilmStrip } from './PhotoFilmStrip'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import { electronPhotoRepository } from '../services/electronPhotoRepository'
 import type { LinkedPhotoRecord, PhotoAvailability } from '../types/photo'
 
@@ -7,6 +11,8 @@ interface PhotoViewerDialogProps {
   selectedPhotoId: string
   isReadonlyMode: boolean
   isUpdating: boolean
+  coverPhotoId: string | null
+  onSetCoverPhoto: (photoId: string | null) => Promise<void>
   onSelect: (photoId: string) => void
   onClose: () => void
   onSaveNote: (photoId: string, note: string) => Promise<void>
@@ -43,6 +49,8 @@ function PhotoViewerDialog({
   selectedPhotoId,
   isReadonlyMode,
   isUpdating,
+  coverPhotoId,
+  onSetCoverPhoto,
   onSelect,
   onClose,
   onSaveNote,
@@ -54,6 +62,8 @@ function PhotoViewerDialog({
 }: PhotoViewerDialogProps) {
   const selectedIndex = photos.findIndex((photo) => photo.id === selectedPhotoId)
   const photo = selectedIndex >= 0 ? photos[selectedIndex] : null
+  const dialogRef = useRef<HTMLElement | null>(null)
+  useFocusTrap(dialogRef, Boolean(photo))
   const [originalUrl, setOriginalUrl] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -192,7 +202,12 @@ function PhotoViewerDialog({
   if (!photo) return null
 
   const removePhoto = async () => {
-    const confirmed = window.confirm('确定从当前路段移除这张照片吗？只会删除软件中的索引和缩略图，不会删除本地原图。')
+    const confirmed = await confirmDialog({
+      title: '从路段移除照片',
+      message: '确定从当前路段移除这张照片吗？只会删除软件中的索引和缩略图，不会删除本地原图。',
+      confirmText: '移除',
+      danger: true,
+    })
     if (!confirmed) return
     setActionError('')
     try {
@@ -227,7 +242,13 @@ function PhotoViewerDialog({
     <div className="photo-viewer-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) void closeAfterSaving()
     }}>
-      <section className="photo-viewer-dialog" role="dialog" aria-modal="true" aria-label={`查看照片 ${photo.originalFilename}`}>
+      <section
+        ref={dialogRef}
+        className="photo-viewer-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`查看照片 ${photo.originalFilename}`}
+      >
         <header className="photo-viewer-header">
           <div>
             <strong>{photo.originalFilename}</strong>
@@ -261,6 +282,28 @@ function PhotoViewerDialog({
             onMouseUp={() => { dragRef.current = null }}
             onMouseLeave={() => { dragRef.current = null }}
           >
+            {previousPhotoId && (
+              <button
+                type="button"
+                className="photo-viewer-nav photo-viewer-nav-prev"
+                onClick={() => void selectAfterSaving(previousPhotoId)}
+                disabled={noteSaveStatus === 'saving'}
+                aria-label="上一张照片"
+              >
+                <AppIcon name="chevronLeft" className="icon-inline" />
+              </button>
+            )}
+            {nextPhotoId && (
+              <button
+                type="button"
+                className="photo-viewer-nav photo-viewer-nav-next"
+                onClick={() => void selectAfterSaving(nextPhotoId)}
+                disabled={noteSaveStatus === 'saving'}
+                aria-label="下一张照片"
+              >
+                <AppIcon name="chevronRight" className="icon-inline" />
+              </button>
+            )}
             {isLoading && <span>正在读取本地原图…</span>}
             {!isLoading && originalUrl && (
               <img
@@ -274,6 +317,7 @@ function PhotoViewerDialog({
               />
             )}
             {!isLoading && !originalUrl && <span>{loadError || availabilityText || '原图不可用。'}</span>}
+            <PhotoFilmStrip photos={photos} selectedPhotoId={selectedPhotoId} onSelect={(photoId) => void selectAfterSaving(photoId)} />
           </div>
 
           <aside className="photo-viewer-sidebar">
@@ -332,6 +376,18 @@ function PhotoViewerDialog({
             </label>
             {!isReadonlyMode && (
               <div className="photo-viewer-metadata-actions">
+                <button
+                  type="button"
+                  className="photo-viewer-cover-button"
+                  onClick={() => {
+                    setActionError('')
+                    void onSetCoverPhoto(coverPhotoId === photo.id ? null : photo.id)
+                      .catch((error) => setActionError(error instanceof Error ? error.message : String(error)))
+                  }}
+                  disabled={isUpdating}
+                >
+                  {coverPhotoId === photo.id ? '取消旅程封面' : '设为旅程封面'}
+                </button>
                 <button type="button" className="btn-primary" onClick={() => void saveNote()} disabled={isUpdating || noteSaveStatus === 'saving' || !noteDirty}>保存备注</button>
                 <button type="button" onClick={() => void refreshMetadata()} disabled={isUpdating}>重新读取照片信息</button>
                 <button
@@ -365,12 +421,23 @@ function PhotoViewerDialog({
             <button type="button" onClick={() => void selectAfterSaving(nextPhotoId)} disabled={!nextPhotoId || noteSaveStatus === 'saving'}>下一张</button>
           </div>
           <div className="photo-viewer-zoom-controls">
-            <button type="button" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))} disabled={zoom <= 0.5}>缩小</button>
+            <button type="button" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))} disabled={zoom <= 0.5} aria-label="缩小">
+              <AppIcon name="zoomOut" className="icon-inline" />
+            </button>
             <span>{Math.round(zoom * 100)}%</span>
-            <button type="button" onClick={() => setZoom((value) => Math.min(4, value + 0.25))} disabled={zoom >= 4}>放大</button>
-            <button type="button" onClick={() => setRotation((value) => value - 90)}>左转</button>
-            <button type="button" onClick={() => setRotation((value) => value + 90)}>右转</button>
-            <button type="button" onClick={() => { setZoom(1); setRotation(0); setOffset({ x: 0, y: 0 }) }}>适应</button>
+            <button type="button" onClick={() => setZoom((value) => Math.min(4, value + 0.25))} disabled={zoom >= 4} aria-label="放大">
+              <AppIcon name="zoomIn" className="icon-inline" />
+            </button>
+            <span className="zoom-control-divider" aria-hidden="true" />
+            <button type="button" onClick={() => setRotation((value) => value - 90)} aria-label="向左旋转 90 度">
+              <AppIcon name="rotateLeft" className="icon-inline" />
+            </button>
+            <button type="button" onClick={() => setRotation((value) => value + 90)} aria-label="向右旋转 90 度">
+              <AppIcon name="rotateRight" className="icon-inline" />
+            </button>
+            <button type="button" onClick={() => { setZoom(1); setRotation(0); setOffset({ x: 0, y: 0 }) }} aria-label="适应窗口">
+              <AppIcon name="fit" className="icon-inline" />
+            </button>
           </div>
         </footer>
       </section>

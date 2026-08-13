@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { AutoCloseDetails } from './AutoCloseDetails'
 import type { Trip } from '../types/trip'
 import { formatDistance, getTripDistanceMeters } from '../utils/distance'
 import { formatDurationSummary, summarizeEstimatedDurations } from '../utils/durations'
@@ -13,6 +14,7 @@ interface TripManageModalProps {
   onMoveTrip: (tripId: string, direction: 'up' | 'down') => void
   onReorderTrips: (orderedTripIds: string[]) => void
   onUpdateTrip: (tripId: string, patch: { title: string; startDate: string; endDate: string }) => boolean
+  onCompleteTrip: (tripId: string) => Promise<void>
 }
 
 interface TripEditDraft {
@@ -34,8 +36,10 @@ function TripManageModal({
   onMoveTrip,
   onReorderTrips,
   onUpdateTrip,
+  onCompleteTrip,
 }: TripManageModalProps) {
   const [draggingTripId, setDraggingTripId] = useState<string | null>(null)
+  const [dragOverTripId, setDragOverTripId] = useState<string | null>(null)
   const [editingTripId, setEditingTripId] = useState<string | null>(null)
   const [draft, setDraft] = useState<TripEditDraft | null>(null)
   const [errorText, setErrorText] = useState('')
@@ -74,12 +78,19 @@ function TripManageModal({
           return (
             <li
               key={trip.id}
-              className="trip-manage-item"
+              className={`trip-manage-item${draggingTripId === trip.id ? ' dragging' : ''}${dragOverTripId === trip.id ? ' drag-target' : ''}`}
               draggable={!isReadonlyMode && !isEditing}
               aria-disabled={isReadonlyMode}
               onDragStart={() => setDraggingTripId(trip.id)}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDragOverTripId(trip.id)
+              }}
+              onDragLeave={() => {
+                setDragOverTripId((current) => (current === trip.id ? null : current))
+              }}
               onDrop={() => {
+                setDragOverTripId(null)
                 if (isReadonlyMode) return
                 if (!draggingTripId || draggingTripId === trip.id) return
                 const orderedIds = [...sortedTrips.map((item) => item.id)]
@@ -91,7 +102,10 @@ function TripManageModal({
                 onReorderTrips(orderedIds)
                 setDraggingTripId(null)
               }}
-              onDragEnd={() => setDraggingTripId(null)}
+              onDragEnd={() => {
+                setDraggingTripId(null)
+                setDragOverTripId(null)
+              }}
             >
               <div className="trip-main-meta">
                 {!isEditing && (
@@ -214,7 +228,7 @@ function TripManageModal({
                     >
                       新建副本
                     </button>
-                    <details className="trip-action-menu">
+                    <AutoCloseDetails className="trip-action-menu">
                       <summary aria-label={`调整“${trip.title}”的排序`}>排序</summary>
                       <div className="trip-action-menu-panel">
                         <button type="button" onClick={() => onMoveTrip(trip.id, 'up')} disabled={isReadonlyMode || index === 0}>
@@ -238,15 +252,28 @@ function TripManageModal({
                           移到底部
                         </button>
                       </div>
-                    </details>
-                    <details className="trip-action-menu trip-more-menu">
+                    </AutoCloseDetails>
+                    <AutoCloseDetails className="trip-action-menu trip-more-menu">
                       <summary aria-label={`打开“${trip.title}”的更多操作`}>更多</summary>
                       <div className="trip-action-menu-panel">
+                        {trip.category === 'plan' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isReadonlyMode) return
+                              void onCompleteTrip(trip.id)
+                              setErrorText('')
+                            }}
+                            disabled={isReadonlyMode}
+                          >
+                            完成旅程，转入复盘
+                          </button>
+                        )}
                         <button type="button" className="danger-btn" onClick={() => onDeleteTrip(trip.id)} disabled={isReadonlyMode}>
                           删除旅程
                         </button>
                       </div>
-                    </details>
+                    </AutoCloseDetails>
                 </div>
               )}
             </li>

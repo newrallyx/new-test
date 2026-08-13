@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { alertDialog } from './ConfirmDialog'
+import EmptyState from './EmptyState'
+import { AppIcon } from './icons'
 import PlaceAutocomplete from './PlaceAutocomplete'
-import type { RoutePreference, RouteSegment, RouteSummary, RouteType, Waypoint } from '../types/trip'
+import type { RoutePreference, RouteSegment, RouteSummary, RouteType, SegmentReviewFacts, Waypoint } from '../types/trip'
 import { formatDistance, getTrackDistanceMeters } from '../utils/distance'
 import {
   formatDurationUpdatedAt,
@@ -8,6 +11,7 @@ import {
   hasCurrentDurationEstimate,
 } from '../utils/durations'
 import SegmentScoreFields from './SegmentScoreFields'
+import SegmentReviewFactsEditor from './SegmentReviewFactsEditor'
 import { formatScoreDisplay } from '../utils/segmentScores'
 import { getRoutePreferenceLabel, routePreferenceOptions } from '../utils/routePreference'
 import {
@@ -16,11 +20,33 @@ import {
   formatTollUpdatedAt,
   hasCurrentTollEstimate,
 } from '../utils/tolls'
+import {
+  buildReviewFactsFromDraft,
+  formatSegmentActualDistance,
+  formatSegmentActualDuration,
+  formatSegmentActualToll,
+  getReviewFactsDraftDefaults,
+  type ReviewFactsDraftInput,
+} from '../utils/reviewFacts'
+import { getReviewTagLabel } from '../utils/reviewTags'
 
 function formatCoordText(coord?: { lat: number; lon: number }): string {
   if (!coord) return '未解析坐标'
   return `${coord.lat.toFixed(6)}, ${coord.lon.toFixed(6)}`
 }
+
+function scrollToAnchor(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const detailAnchorItems = [
+  { id: 'detail-seg-meta', label: '信息' },
+  { id: 'detail-seg-route', label: '路线' },
+  { id: 'detail-seg-endpoints', label: '起终点' },
+  { id: 'detail-seg-waypoints', label: '途经点' },
+  { id: 'detail-seg-score', label: '评分' },
+  { id: 'detail-seg-note', label: '备注' },
+]
 
 interface FilterContext {
   tripName: string
@@ -49,6 +75,7 @@ interface DetailEditDraft {
   scenicScore: number | null
   difficultyScore: number | null
   note: string
+  reviewFactsDraft: ReviewFactsDraftInput
 }
 
 interface TripListItem {
@@ -111,6 +138,7 @@ interface MapPlaceholderProps {
   onSelectEndpointPlace: (field: 'startPoint' | 'endPoint', payload: { label: string; lat: number; lng: number; amapId?: string }) => void
   onUpdateSegmentScore: (field: 'scenicScore' | 'difficultyScore', value: number | null) => void
   onUpdateSegmentNote: (value: string) => void
+  onUpdateSegmentReviewFacts: (facts: SegmentReviewFacts | undefined) => void
   onDetailDraftStateChange: (state: { segmentId: string | null; dirty: boolean }) => void
   onRefreshRouteEstimate: () => void
   isRouteEstimateRefreshing: boolean
@@ -160,6 +188,7 @@ function MapPlaceholder({
   onSelectEndpointPlace,
   onUpdateSegmentScore,
   onUpdateSegmentNote,
+  onUpdateSegmentReviewFacts,
   onDetailDraftStateChange,
   onRefreshRouteEstimate,
   isRouteEstimateRefreshing,
@@ -185,9 +214,12 @@ function MapPlaceholder({
       )
     )
     const waypointDirty = JSON.stringify(waypoints) !== JSON.stringify(activeSegment.waypoints ?? [])
+    const reviewFactsDirty = JSON.stringify(buildReviewFactsFromDraft(detailDraft.reviewFactsDraft))
+      !== JSON.stringify(activeSegment.reviewFacts ?? undefined)
     return metaDirty
       || endpointDirty
       || waypointDirty
+      || reviewFactsDirty
       || detailDraft.routeMode !== routeMode
       || detailDraft.routePreference !== routePreference
       || detailDraft.scenicScore !== (activeSegment.scenicScore ?? null)
@@ -210,8 +242,19 @@ function MapPlaceholder({
     setDetailDraft(null)
   }, [activeSegmentId, detailDraft, onCancelEndpointEdit, onCancelSegmentMetaEdit, onCancelWaypointEdit])
 
-  const startDetailEdit = () => {
-    if (!activeSegment || isReadonlyMode) return
+  useEffect(() => {
+    if (!detailEditMode) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        saveDetailEdit()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
+  const startDetailEdit = () => {    if (!activeSegment || isReadonlyMode) return
     onStartSegmentMetaEdit(activeSegment.id)
     onStartEndpointEdit()
     onStartWaypointEdit()
@@ -222,6 +265,7 @@ function MapPlaceholder({
       scenicScore: activeSegment.scenicScore ?? null,
       difficultyScore: activeSegment.difficultyScore ?? null,
       note: activeSegment.note ?? '',
+      reviewFactsDraft: getReviewFactsDraftDefaults(activeSegment.reviewFacts),
     })
   }
 
@@ -246,6 +290,7 @@ function MapPlaceholder({
       onUpdateSegmentScore('difficultyScore', detailDraft.difficultyScore)
     }
     if (detailDraft.note !== (activeSegment.note ?? '')) onUpdateSegmentNote(detailDraft.note)
+    onUpdateSegmentReviewFacts(buildReviewFactsFromDraft(detailDraft.reviewFactsDraft))
     setDetailDraft(null)
   }
 
@@ -287,7 +332,13 @@ function MapPlaceholder({
             </li>
           ))}
         </ul>
-        {!tripListItems.length && <p className="hint-text">暂无旅程，请先在上方新增旅程。</p>}
+        {!tripListItems.length && (
+          <EmptyState
+            icon="trip"
+            title="还没有旅程"
+            description="在上方「新增旅程」创建你的第一条自驾记录。"
+          />
+        )}
       </section>
     )
   }
@@ -309,7 +360,7 @@ function MapPlaceholder({
       )}
 
       {!!activeSegment && (
-        <div className={`segment-meta-editor ${detailEditMode ? 'editing' : ''}`}>
+        <div id="detail-seg-meta" className={`segment-meta-editor ${detailEditMode ? 'editing' : ''}`}>
           <div className="segment-detail-edit-header">
             <div>
               <p>轨迹信息</p>
@@ -384,6 +435,7 @@ function MapPlaceholder({
                   onClick={() => onDeleteSegment({ segmentId: segment.id, index, name: segment.name })}
                   disabled={isReadonlyMode}
                 >
+                  <AppIcon name="trash" className="icon-inline" />
                   删除
                 </button>
               </div>
@@ -398,10 +450,28 @@ function MapPlaceholder({
         ))}
       </ul>
 
-      {filteredSegments.length === 0 && <p className="hint-text">当前筛选下暂无路段数据。</p>}
+      {filteredSegments.length === 0 && (
+        <EmptyState
+          icon="segment"
+          title="当前筛选下暂无路段"
+          description="试试调整上方的旅程 / 日期 / 路段筛选，或新建路段。"
+        />
+      )}
 
       {!!activeSegment && (
         <>
+        <nav className="detail-anchor-nav" aria-label="路段详情快速导航">
+          {detailAnchorItems.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              onClick={() => scrollToAnchor(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
         {detailEditMode && detailDraft ? (
           <div className="segment-route-edit-grid">
             <label className="route-type-control">
@@ -435,8 +505,9 @@ function MapPlaceholder({
           </div>
         )}
 
-        <div className="segment-detail-section toll-detail-section">
-          <p>路线预估</p>
+        <details id="detail-seg-route" className="detail-collapsible" open>
+          <summary>路线预估</summary>
+          <div className="detail-collapsible-body">
           <div className="segment-detail-readonly-grid">
             <div><small>预计行驶时间</small><strong>{formatSegmentEstimatedDuration(activeSegment)}</strong></div>
             <div>
@@ -462,9 +533,10 @@ function MapPlaceholder({
             </button>
           )}
           <p className="hint-text">预估时间仅包含路线行驶时间，实际用时受路况、天气及途中停留影响；预估金额以实际收费为准。</p>
-        </div>
+          </div>
+        </details>
 
-        <div className="endpoint-section">
+        <div id="detail-seg-endpoints" className="endpoint-section">
           <p>起点 / 终点</p>
           {!detailEditMode ? (
             <div className="endpoint-readonly-grid">
@@ -523,8 +595,9 @@ function MapPlaceholder({
           )}
         </div>
 
-        <div className="waypoint-section">
-          <p>途经点（Waypoints）</p>
+        <details id="detail-seg-waypoints" className="detail-collapsible" open>
+          <summary>途经点<span className="detail-collapsible-count">{waypoints.length}</span></summary>
+          <div className="detail-collapsible-body">
           <p>途经点数量：{waypoints.length}</p>
 
           {detailEditMode && (
@@ -585,7 +658,7 @@ function MapPlaceholder({
                     type="button"
                     onClick={() => {
                       if (typeof waypoint.lat !== 'number' || typeof waypoint.lng !== 'number') {
-                        window.alert('该途经点未解析坐标，请先选择搜索结果。')
+                        void alertDialog('该途经点未解析坐标，请先选择搜索结果。')
                         return
                       }
                       onLocateWaypoint(waypoint)
@@ -598,20 +671,33 @@ function MapPlaceholder({
             ))}
           </ul>
           {!waypoints.length && <p className="hint-text">当前路段无途经点。</p>}
-        </div>
+          </div>
+        </details>
 
         {detailEditMode && detailDraft ? (
-          <SegmentScoreFields
-            title="轨迹评分"
-            values={{ scenicScore: detailDraft.scenicScore, difficultyScore: detailDraft.difficultyScore }}
-            onChange={(field, value) => {
-              setDetailDraft((current) => current ? { ...current, [field]: value } : current)
-            }}
-            disabled={isReadonlyMode}
-            hintText="支持 1.0 ~ 10.0，系统会自动限制范围并规范为 1 位小数。"
-          />
+          <div id="detail-seg-score" className="segment-score-section">
+            <SegmentScoreFields
+              title="轨迹评分"
+              values={{ scenicScore: detailDraft.scenicScore, difficultyScore: detailDraft.difficultyScore }}
+              onChange={(field, value) => {
+                setDetailDraft((current) => current ? { ...current, [field]: value } : current)
+              }}
+              disabled={isReadonlyMode}
+              hintText="支持 1.0 ~ 10.0，系统会自动限制范围并规范为 1 位小数。"
+            />
+            <SegmentReviewFactsEditor
+              draft={detailDraft.reviewFactsDraft}
+              onDraftChange={(patch) => {
+                setDetailDraft((current) => current
+                  ? { ...current, reviewFactsDraft: { ...current.reviewFactsDraft, ...patch } }
+                  : current)
+              }}
+              disabled={isReadonlyMode}
+              hintText="实际里程/时间/过路费可选填；未填写的路段在汇总时不会被统计。"
+            />
+          </div>
         ) : (
-          <div className="segment-detail-section">
+          <div id="detail-seg-score" className="segment-detail-section">
             <p>轨迹评分</p>
             <div className="segment-detail-readonly-grid">
               <div><small>风景评分</small><strong>{formatScoreDisplay(activeSegment.scenicScore)}</strong></div>
@@ -620,7 +706,47 @@ function MapPlaceholder({
           </div>
         )}
 
-        <div className="segment-note-section">
+        {!detailEditMode && activeSegment.reviewFacts && (
+          <div id="detail-seg-facts" className="segment-detail-section">
+            <p>实际记录</p>
+            {(activeSegment.reviewFacts.tags?.length ?? 0) > 0 && (
+              <div className="segment-review-tag-options roadbook-tags-readonly">
+                {activeSegment.reviewFacts.tags?.map((tag) => (
+                  <span key={tag} className="review-tag-chip selected">{getReviewTagLabel(tag)}</span>
+                ))}
+              </div>
+            )}
+            {(() => {
+              const actualDistance = formatSegmentActualDistance(activeSegment)
+              const actualDuration = formatSegmentActualDuration(activeSegment)
+              const actualToll = formatSegmentActualToll(activeSegment)
+              const rows = [
+                actualDistance ? ['里程', formatDistance(getTrackDistanceMeters(activeSegment)), actualDistance] : null,
+                actualDuration ? ['用时', formatSegmentEstimatedDuration(activeSegment), actualDuration] : null,
+                actualToll ? ['过路费', formatSegmentEstimatedToll(activeSegment), actualToll] : null,
+              ].filter((row): row is string[] => Boolean(row))
+              if (rows.length === 0) return null
+              return (
+                <table className="segment-actual-compare-table">
+                  <thead>
+                    <tr><th>项目</th><th>预计</th><th>实际</th></tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(([label, estimated, actual]) => (
+                      <tr key={label}>
+                        <td>{label}</td>
+                        <td>{estimated}</td>
+                        <td><strong>{actual}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            })()}
+          </div>
+        )}
+
+        <div id="detail-seg-note" className="segment-note-section">
           <label className="form-field-label" htmlFor="detail-segment-note">轨迹备注</label>
           {detailEditMode && detailDraft ? (
             <textarea

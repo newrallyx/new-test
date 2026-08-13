@@ -87,7 +87,12 @@ function MapPanel({
 
   return (
     <section className="card-section map-section-with-toolbar">
-      {loading && <p className="hint-text">正在加载轨迹点位...</p>}
+      {loading && (
+        <div className="map-loading-overlay" role="status" aria-live="polite">
+          <span className="map-loading-spinner" />
+          <span>正在加载轨迹点位…</span>
+        </div>
+      )}
       {!loading && message.startsWith('未解析') && <p className="hint-text">{message}</p>}
 
       {editingSegmentId && !isReadonlyMode && (

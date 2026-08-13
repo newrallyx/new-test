@@ -1,10 +1,18 @@
 import { mockTripReview } from './mockData.ts'
-import type { CoordPoint, RouteSegment, TripReview, Waypoint } from '../types/trip'
+import type {
+  ActualDriveResult,
+  CoordPoint,
+  RouteSegment,
+  SegmentReviewFacts,
+  TripReview,
+  Waypoint,
+} from '../types/trip'
 import { sortTripDaysByDate } from '../utils/date.ts'
 import { normalizeScore, normalizeSegmentNote } from '../utils/segmentScores.ts'
 import { normalizeTripOrders } from '../utils/tripOrder.ts'
 import { normalizeTollValue } from '../utils/tolls.ts'
 import { normalizeDurationSeconds } from '../utils/durations.ts'
+import { isReviewTag } from '../utils/reviewTags.ts'
 
 // 本地存储服务：统一处理 TripReview 的读取与保存，避免组件直接操作 localStorage。
 export const TRIP_STORAGE_KEY = 'trip-review-data-v1'
@@ -88,6 +96,50 @@ export function normalizePhotoIds(value: unknown): string[] | undefined {
   return photoIds.length > 0 ? photoIds : undefined
 }
 
+const ACTUAL_DISTANCE_MAX_METERS = 10_000_000
+const ACTUAL_TOLL_MAX_YUAN = 1_000_000
+
+function normalizeActualDriveResult(value: unknown): ActualDriveResult | undefined {
+  if (!value || typeof value !== 'object') return undefined
+
+  const candidate = value as Record<string, unknown>
+  const result: ActualDriveResult = {}
+
+  if (typeof candidate.distanceMeters === 'number'
+    && Number.isFinite(candidate.distanceMeters)
+    && candidate.distanceMeters > 0
+    && candidate.distanceMeters <= ACTUAL_DISTANCE_MAX_METERS) {
+    result.distanceMeters = Math.round(candidate.distanceMeters)
+  }
+
+  const durationSeconds = normalizeDurationSeconds(candidate.durationSeconds)
+  if (durationSeconds !== undefined) result.durationSeconds = durationSeconds
+
+  const tollYuan = normalizeTollValue(candidate.tollYuan)
+  if (tollYuan !== undefined && tollYuan <= ACTUAL_TOLL_MAX_YUAN) result.tollYuan = tollYuan
+
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
+function normalizeReviewFacts(value: unknown): SegmentReviewFacts | undefined {
+  if (!value || typeof value !== 'object') return undefined
+
+  const candidate = value as Record<string, unknown>
+  const facts: SegmentReviewFacts = {}
+
+  if (Array.isArray(candidate.tags)) {
+    const tags = Array.from(
+      new Set(candidate.tags.filter(isReviewTag)),
+    )
+    if (tags.length > 0) facts.tags = tags
+  }
+
+  const actual = normalizeActualDriveResult(candidate.actual)
+  if (actual) facts.actual = actual
+
+  return Object.keys(facts).length > 0 ? facts : undefined
+}
+
 function normalizeLegacyViaPointsText(viaPointsText: unknown): Waypoint[] | undefined {
   if (typeof viaPointsText !== 'string') return undefined
   const names = viaPointsText
@@ -126,6 +178,7 @@ function normalizeRouteSegment(segment: RouteSegment): RouteSegment {
     difficultyScore: normalizeScore(segment.difficultyScore),
     note: normalizeSegmentNote(segment.note),
     photoIds: normalizePhotoIds(segment.photoIds),
+    reviewFacts: normalizeReviewFacts(segment.reviewFacts),
     estimatedDurationSeconds: normalizeDurationSeconds(segment.estimatedDurationSeconds),
     durationUpdatedAt: typeof segment.durationUpdatedAt === 'string' ? segment.durationUpdatedAt : undefined,
     estimatedTollYuan: normalizeTollValue(segment.estimatedTollYuan),
@@ -134,11 +187,16 @@ function normalizeRouteSegment(segment: RouteSegment): RouteSegment {
   }
 }
 
+function normalizeCoverPhotoId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
 function normalizeTripReview(input: TripReview): TripReview {
   return {
     ...input,
     trips: normalizeTripOrders((input.trips ?? []).map((trip) => ({
       ...trip,
+      coverPhotoId: normalizeCoverPhotoId(trip.coverPhotoId),
       category: trip.category === 'plan' ? 'plan' : 'review',
       days: sortTripDaysByDate(
         (trip.days ?? []).map((day) => ({
@@ -179,6 +237,7 @@ function toPersistedRouteSegment(segment: RouteSegment): RouteSegment {
     difficultyScore: normalizeScore(segment.difficultyScore),
     note: normalizeSegmentNote(segment.note),
     photoIds: normalizePhotoIds(segment.photoIds),
+    reviewFacts: normalizeReviewFacts(segment.reviewFacts),
   }
 }
 
@@ -186,6 +245,7 @@ export function toPersistedTripReview(data: TripReview): TripReview {
   return {
     trips: normalizeTripOrders(data.trips).map((trip) => ({
       ...trip,
+      coverPhotoId: normalizeCoverPhotoId(trip.coverPhotoId),
       days: sortTripDaysByDate(
         trip.days.map((day) => ({
           ...day,

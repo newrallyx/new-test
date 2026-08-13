@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { confirmDialog } from '../../components/ConfirmDialog'
 import { deleteSegmentRouteCache } from '../../services/routeCacheDb'
 import type { Trip } from '../../types/trip'
 import { addDaysToIsoDate, sortTripDaysByDate } from '../../utils/date'
@@ -85,7 +86,7 @@ export function useDayActions({
     return insertedDayId
   }, [blockReadonlyWrite, resetEditingState, setFilters, setTripReview, workspaceTrips])
 
-  const deleteDay = useCallback((tripId: string, dayId: string): boolean => {
+  const deleteDay = useCallback(async (tripId: string, dayId: string): Promise<boolean> => {
     if (blockReadonlyWrite('deleteDay')) return false
 
     const sourceTrip = workspaceTrips.find((trip) => trip.id === tripId)
@@ -95,11 +96,14 @@ export function useDayActions({
     if (!sourceTrip || !sourceDay) return false
 
     const segmentCount = sourceDay.routeSegments.length
-    const confirmed = window.confirm(
-      segmentCount > 0
+    const confirmed = await confirmDialog({
+      title: '删除日期',
+      message: segmentCount > 0
         ? `确定删除 ${sourceDay.date} 吗？当天的 ${segmentCount} 条路段也会被删除，后续日期将提前一天。此操作不可恢复。`
         : `确定删除 ${sourceDay.date} 吗？后续日期将提前一天。此操作不可恢复。`,
-    )
+      confirmText: '删除',
+      danger: true,
+    })
     if (!confirmed) return false
 
     const deletedSegmentIds = new Set(sourceDay.routeSegments.map((segment) => segment.id))

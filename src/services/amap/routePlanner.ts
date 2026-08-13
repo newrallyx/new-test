@@ -171,11 +171,16 @@ export async function planCyclingRoute(
     await sleep(ROUTE_REQUEST_DELAY_MS)
     const polyline: Array<[number, number]> = []
     let distanceMeters = 0
+    let hasCompleteDistance = true
     const legDurations: Array<number | undefined> = []
 
     for (let index = 0; index < points.length - 1; index += 1) {
       const leg = await requestCyclingRoute(toLonLatText(points[index]), toLonLatText(points[index + 1]))
-      distanceMeters += Number(leg.distanceText.replace(/[^\d.]/g, '')) || 0
+      if (typeof leg.distanceMeters === 'number') {
+        distanceMeters += leg.distanceMeters
+      } else {
+        hasCompleteDistance = false
+      }
       legDurations.push(leg.durationSeconds)
       polyline.push(...leg.polyline)
     }
@@ -185,11 +190,11 @@ export async function planCyclingRoute(
     const durationSeconds = sumCompleteDurationSeconds(legDurations)
     const route: DrivingRouteResult = {
       polyline,
-      distanceText: `${Math.round(distanceMeters)} 米`,
+      distanceText: hasCompleteDistance ? `${Math.round(distanceMeters)} 米` : '未知',
       durationText: typeof durationSeconds === 'number' ? `${durationSeconds} 秒` : '未知',
       durationSeconds,
       durationUpdatedAt: typeof durationSeconds === 'number' ? new Date().toISOString() : undefined,
-      distanceMeters: Math.round(distanceMeters),
+      distanceMeters: hasCompleteDistance ? Math.round(distanceMeters) : undefined,
       routeKey,
     }
     routeCache.set(routeKey, route)

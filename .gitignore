@@ -9,3 +9,5 @@ dist/
 /vite.config.d.ts
 /backup/
 release/
+.playwright-cli/
+/output/

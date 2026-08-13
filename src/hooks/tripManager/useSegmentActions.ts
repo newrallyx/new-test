@@ -9,6 +9,7 @@ import type {
   Waypoint,
 } from '../../types/trip'
 import { sortTripDaysByDate } from '../../utils/date'
+import { moveSegmentById, reorderSegmentsById } from '../../utils/segmentOrder'
 import { normalizeScore, normalizeSegmentNote } from '../../utils/segmentScores'
 import type {
   BlockReadonlyWrite,
@@ -144,27 +145,14 @@ export function useSegmentActions({
       const ref = findSegmentRef(segmentId, prev)
       if (!ref) return prev
 
-      const segmentIdsInTrip = ref.trip.days.flatMap((day) => day.routeSegments.map((segment) => segment.id))
-      const currentFlatIndex = segmentIdsInTrip.findIndex((id) => id === segmentId)
-      const nextFlatIndex = direction === 'up' ? currentFlatIndex - 1 : currentFlatIndex + 1
-      if (currentFlatIndex < 0 || nextFlatIndex < 0 || nextFlatIndex >= segmentIdsInTrip.length) return prev
-
-      const targetId = segmentIdsInTrip[nextFlatIndex]
-      const targetRefInTrip = ref.trip.days
-        .flatMap((day, dayIdx) => day.routeSegments.map((segment, segIdx) => ({ dayIdx, segIdx, id: segment.id })))
-        .find((item) => item.id === targetId)
-
-      if (!targetRefInTrip || targetRefInTrip.dayIdx !== ref.dayIndex) return prev
-
       const nextTrips = prev.trips.map((trip, tripIndex) => {
         if (tripIndex !== ref.tripIndex) return trip
         return {
           ...trip,
           days: trip.days.map((day, dayIndex) => {
             if (dayIndex !== ref.dayIndex) return day
-            const nextRouteSegments = [...day.routeSegments]
-            const [moved] = nextRouteSegments.splice(ref.segmentIndex, 1)
-            nextRouteSegments.splice(targetRefInTrip.segIdx, 0, moved)
+            const nextRouteSegments = moveSegmentById(day.routeSegments, segmentId, direction)
+            if (nextRouteSegments === day.routeSegments) return day
             return { ...day, routeSegments: nextRouteSegments }
           }),
         }
@@ -178,12 +166,28 @@ export function useSegmentActions({
     if (!segmentId || !filters.tripId) return false
     const ref = findSegmentRef(segmentId)
     if (!ref || ref.trip.id !== filters.tripId) return false
-    const flat = ref.trip.days.flatMap((day) => day.routeSegments.map((segment) => ({ id: segment.id, dayId: day.id })))
-    const current = flat.findIndex((item) => item.id === segmentId)
+    const current = ref.day.routeSegments.findIndex((segment) => segment.id === segmentId)
     const target = direction === 'up' ? current - 1 : current + 1
-    if (current < 0 || target < 0 || target >= flat.length) return false
-    return flat[target].dayId === ref.day.id
+    return current >= 0 && target >= 0 && target < ref.day.routeSegments.length
   }, [filters.tripId, findSegmentRef])
+
+  const reorderDaySegments = useCallback((tripId: string, dayId: string, orderedSegmentIds: string[]) => {
+    if (blockReadonlyWrite('reorderDaySegments')) return
+    setTripReview((prev) => ({
+      trips: prev.trips.map((trip) => {
+        if (trip.id !== tripId) return trip
+        return {
+          ...trip,
+          days: trip.days.map((day) => {
+            if (day.id !== dayId) return day
+            const nextRouteSegments = reorderSegmentsById(day.routeSegments, orderedSegmentIds)
+            if (nextRouteSegments === day.routeSegments) return day
+            return { ...day, routeSegments: nextRouteSegments }
+          }),
+        }
+      }),
+    }))
+  }, [blockReadonlyWrite, setTripReview])
 
   const addSegment = useCallback((payload: {
     tripId: string
@@ -302,6 +306,7 @@ export function useSegmentActions({
     updateSegmentMeta,
     moveSegmentInTrip,
     canMoveSegment,
+    reorderDaySegments,
     addSegment,
     deleteSegment,
   }

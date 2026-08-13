@@ -6,6 +6,8 @@ declare global {
   interface Window {
     roadtripDesktop?: RoadtripDesktopApi
   }
+
+  declare const __APP_VERSION__: string
 }
 
 export {}

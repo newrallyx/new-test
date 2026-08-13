@@ -65,7 +65,7 @@ function SegmentPhotoThumbnail({
       aria-label={`查看照片 ${photo.originalFilename}`}
     >
       {selectionMode && <span className="segment-photo-selection-indicator">{selected ? '✓' : ''}</span>}
-      <div className="segment-photo-thumb-wrap">
+      <div className={`segment-photo-thumb-wrap${!thumbnailUrl && !loadFailed ? ' shimmer' : ''}`}>
         {thumbnailUrl ? (
           <img src={thumbnailUrl} alt={photo.originalFilename} loading="lazy" />
         ) : (

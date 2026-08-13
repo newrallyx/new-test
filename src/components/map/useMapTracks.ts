@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { planCyclingRoute, planDrivingRoute, searchAmapInputTips } from '../../services/amap'
-import { saveSegmentRouteCache } from '../../services/routeCacheDb'
+import { getSegmentRouteCache, saveSegmentRouteCache } from '../../services/routeCacheDb'
 import type { RouteSegment } from '../../types/trip'
-import { buildSegmentRouteKey } from '../../utils/routeBuildKey'
+import { buildSegmentRouteKey, canDisplaySegmentRouteCache, canReuseRecordedRoute } from '../../utils/routeBuildKey'
 import { hasCurrentDurationEstimate } from '../../utils/durations'
 import { hasCurrentTollEstimate } from '../../utils/tolls'
 import { getUnresolvedNamedWaypoints, hasResolvedWaypointCoordinate } from '../../utils/waypointValidation'
@@ -41,15 +41,11 @@ export function useMapTracks({
 
   const segmentDescriptors = useMemo<SegmentRouteDescriptor[]>(
     () =>
-      filteredSegments.map((segment) => {
-        const buildKey = buildSegmentRouteKey(segment)
-        const hasPersistentLine = Array.isArray(segment.points) && segment.points.length >= 2
-        return {
-          segment,
-          buildKey,
-          canReusePersisted: hasPersistentLine && segment.routeBuildKey === buildKey,
-        }
-      }),
+      filteredSegments.map((segment) => ({
+        segment,
+        buildKey: buildSegmentRouteKey(segment),
+        canReusePersisted: canReuseRecordedRoute(segment),
+      })),
     [filteredSegments],
   )
 
@@ -111,7 +107,14 @@ export function useMapTracks({
           const needsTollEstimate = routeType === 'DRIVING' && !hasCurrentTollEstimate(segment)
           const needsDurationEstimate = !hasCurrentDurationEstimate(segment)
 
-          if (canReusePersisted && segment.points && !needsTollEstimate && !needsDurationEstimate && !forceRefresh) {
+          // 已记录路线（几何与当前起终点/途经点/偏好匹配）是用户的原始记录，
+          // 缺少时长/过路费估算时也绝不自动重算覆盖；估算仅可通过手动“刷新路线估算”更新。
+          if (canReusePersisted && segment.points && !forceRefresh) {
+            if (needsTollEstimate || needsDurationEstimate) {
+              warnings.push(
+                `路段「${segment.name}」已保留已记录路线；时长/过路费估算待计算，可点击“刷新路线估算”更新。`,
+              )
+            }
             partialTracks[index] = {
               segmentId: segment.id,
               segmentName: segment.name,
@@ -119,6 +122,27 @@ export function useMapTracks({
               line: segment.points,
             }
             return
+          }
+
+          // IndexedDB 兜底：内存点数缺失（应用启动时 hydration 尚未完成、或全局/只读
+          // 视图）时，先从持久缓存读取已记录几何；只要缓存存在且与当前路线输入匹配，
+          // 就绝不自动重算覆盖。仅当既无内存点数也无持久缓存时才允许自动规划。
+          if (!forceRefresh && !segment.points?.length) {
+            const cache = await getSegmentRouteCache(segment.id)
+            if (cache && cache.points.length && canDisplaySegmentRouteCache(segment, cache.routeBuildKey)) {
+              if (needsTollEstimate || needsDurationEstimate) {
+                warnings.push(
+                  `路段「${segment.name}」已保留已记录路线；时长/过路费估算待计算，可点击“刷新路线估算”更新。`,
+                )
+              }
+              partialTracks[index] = {
+                segmentId: segment.id,
+                segmentName: segment.name,
+                points: markerPoints,
+                line: cache.points,
+              }
+              return
+            }
           }
 
           if (!shouldPlanMissing) {
@@ -191,6 +215,7 @@ export function useMapTracks({
           } else {
             const reason = error?.message ?? '未知错误'
             warnings.push(`路段「${segment.name}」规划失败：${reason}。`)
+            if (canReusePersisted && segment.points) line = segment.points
           }
 
           partialTracks[index] = {

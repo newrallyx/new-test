@@ -70,6 +70,9 @@ export function MapCanvas({
   loading,
   onEndpointDraftChange,
 }: MapCanvasProps) {
+  const isDarkTheme = typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches
+  const tileStyle = isDarkTheme ? 7 : 8
   const allLatLng = useMemo(() => renderedTracks.flatMap((track) => toLatLng(track.line)), [renderedTracks])
   const mapResizeKey = `${renderedTracks.length}-${editingSegmentId ?? ''}-${loading ? 'loading' : 'idle'}`
   const segmentMap = useMemo(
@@ -96,7 +99,7 @@ export function MapCanvas({
         <MapResizeController watchKey={mapResizeKey} />
         <TileLayer
           attribution='&copy; <a href="https://www.amap.com/">Amap</a>'
-          url="https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"
+          url={`https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=${tileStyle}&x={x}&y={y}&z={z}`}
           subdomains={[1, 2, 3, 4]}
         />
 
@@ -104,8 +107,8 @@ export function MapCanvas({
           if (track.line.length < 2) return null
           const sourceSegment = segmentMap.get(track.segmentId)
           const lineColor = sourceSegment
-            ? getSegmentDisplayColor(sourceSegment, routeColorMode, '#2563eb')
-            : '#2563eb'
+            ? getSegmentDisplayColor(sourceSegment, routeColorMode, '#4f46e5')
+            : '#4f46e5'
           const modeScore =
             routeColorMode === 'default' || !sourceSegment
               ? 'default'

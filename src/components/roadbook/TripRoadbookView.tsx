@@ -5,20 +5,26 @@ import { formatDurationSummary, summarizeEstimatedDurations } from '../../utils/
 import { formatTollSummary, summarizeEstimatedTolls } from '../../utils/tolls'
 import { formatActualSummaryText, summarizeActualResults } from '../../utils/reviewFacts'
 import { buildTripFactSummary } from '../../utils/factSummary'
+import { buildTripTravelogue, createTravelogueFilename } from '../../utils/travelogue'
 import { useRoadbookPhotos } from '../../hooks/useRoadbookPhotos'
 import PhotoViewerDialog from '../PhotoViewerDialog'
 import RoadbookDaySection from './RoadbookDaySection'
 import RoadbookMap from './RoadbookMap'
+import TravelogueDialog from './TravelogueDialog'
 import type { Trip } from '../../types/trip'
 
 interface TripRoadbookViewProps {
   trip: Trip
   onBack: () => void
+  isReadonlyMode: boolean
+  onSaveTravelogue: (travelogue: string) => void
 }
 
-function TripRoadbookView({ trip, onBack }: TripRoadbookViewProps) {
+function TripRoadbookView({ trip, onBack, isReadonlyMode, onSaveTravelogue }: TripRoadbookViewProps) {
   const { photosBySegment, allPhotos, desktopAvailable } = useRoadbookPhotos(trip)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
+  const [travelogueOpen, setTravelogueOpen] = useState(false)
+  const [travelogueText, setTravelogueText] = useState('')
 
   const sortedDays = useMemo(() => [...trip.days].sort((a, b) => a.date.localeCompare(b.date)), [trip.days])
 
@@ -47,11 +53,44 @@ function TripRoadbookView({ trip, onBack }: TripRoadbookViewProps) {
   const ignorePhotoAction = useCallback(async () => {}, [])
   const ignoreSelectPhoto = useCallback(() => {}, [])
 
+  const savedTravelogue = trip.travelogue?.trim() ?? ''
+  const travelogueDirty = travelogueOpen && travelogueText !== savedTravelogue
+
+  const openTravelogue = useCallback(() => {
+    setTravelogueText(savedTravelogue || buildTripTravelogue(trip))
+    setTravelogueOpen(true)
+  }, [savedTravelogue, trip])
+
+  const closeTravelogue = useCallback(() => {
+    setTravelogueOpen(false)
+  }, [])
+
+  const regenerateTravelogue = useCallback(() => {
+    setTravelogueText(buildTripTravelogue(trip))
+  }, [trip])
+
+  const saveTravelogue = useCallback(() => {
+    onSaveTravelogue(travelogueText.trim())
+  }, [onSaveTravelogue, travelogueText])
+
+  const downloadTravelogue = useCallback(() => {
+    const blob = new Blob([travelogueText], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = createTravelogueFilename(trip.title)
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }, [travelogueText, trip.title])
+
   return (
     <section className="roadbook-view roadbook-trip-page" aria-label={`路书：${trip.title}`}>
       <div className="roadbook-toolbar">
         <button type="button" className="btn-secondary" onClick={onBack}>
           ‹ 返回书架
+        </button>
+        <button type="button" className="btn-secondary roadbook-travelogue-button" onClick={openTravelogue}>
+          {savedTravelogue ? '查看游记' : '生成游记'}
         </button>
       </div>
 
@@ -117,6 +156,17 @@ function TripRoadbookView({ trip, onBack }: TripRoadbookViewProps) {
           onRepairPath={ignorePhotoAction}
         />
       )}
+
+      <TravelogueDialog
+        open={travelogueOpen}
+        text={travelogueText}
+        isDirty={travelogueDirty}
+        isReadonlyMode={isReadonlyMode}
+        onRegenerate={regenerateTravelogue}
+        onSave={saveTravelogue}
+        onDownload={downloadTravelogue}
+        onClose={closeTravelogue}
+      />
     </section>
   )
 }

@@ -191,12 +191,17 @@ function normalizeCoverPhotoId(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
+function normalizeTravelogue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
+}
+
 function normalizeTripReview(input: TripReview): TripReview {
   return {
     ...input,
     trips: normalizeTripOrders((input.trips ?? []).map((trip) => ({
       ...trip,
       coverPhotoId: normalizeCoverPhotoId(trip.coverPhotoId),
+      travelogue: normalizeTravelogue(trip.travelogue),
       category: trip.category === 'plan' ? 'plan' : 'review',
       days: sortTripDaysByDate(
         (trip.days ?? []).map((day) => ({
@@ -246,6 +251,7 @@ export function toPersistedTripReview(data: TripReview): TripReview {
     trips: normalizeTripOrders(data.trips).map((trip) => ({
       ...trip,
       coverPhotoId: normalizeCoverPhotoId(trip.coverPhotoId),
+      travelogue: normalizeTravelogue(trip.travelogue),
       days: sortTripDaysByDate(
         trip.days.map((day) => ({
           ...day,

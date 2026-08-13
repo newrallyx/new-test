@@ -106,6 +106,8 @@ export interface Trip {
   days: TripDay[]
   /** 手动指定的旅程封面照片；被移除或不可访问时回退到默认封面。 */
   coverPhotoId?: string
+  /** 生成的游记 Markdown 文本；保存后可在路书浏览中再次查看或下载。 */
+  travelogue?: string
 }
 
 export interface TripReview {

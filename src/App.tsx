@@ -287,6 +287,15 @@ function App() {
     }))
   }, [filters.tripId, isReadonlyDemoMode, setTripReview])
 
+  const saveTripTravelogue = useCallback((tripId: string, travelogue: string) => {
+    if (isReadonlyDemoMode) return
+    setTripReview((prev) => ({
+      trips: prev.trips.map((trip) =>
+        trip.id === tripId ? { ...trip, travelogue } : trip,
+      ),
+    }))
+  }, [isReadonlyDemoMode, setTripReview])
+
   const handleCompleteTrip = useCallback(async (tripId: string) => {
     const completed = await tripManager.completeTrip(tripId)
     if (!completed) return
@@ -664,6 +673,8 @@ function App() {
             <TripRoadbookView
               trip={workspaceTrips.find((trip) => trip.id === roadbookTripId) as Trip}
               onBack={() => setRoadbookTripId(null)}
+              isReadonlyMode={isReadonlyDemoMode}
+              onSaveTravelogue={(travelogue) => saveTripTravelogue(roadbookTripId as string, travelogue)}
             />
           ) : (
             <RoadbookLibraryView trips={workspaceTrips} items={tripBookItems} onOpenTrip={setRoadbookTripId} />
